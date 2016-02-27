@@ -12,7 +12,7 @@ mu = [0,0]
 W = 1
 R = 2
 
-# Find surface points (we can set standard deviations, covariance, and means)
+# Find surface points (we can set mu = mean, W = thermal height, and R = radius)
 Z = simpTh.norm2D(X,Y,mu,W,R)
 #mlab.bivariate_normal(X, Y, sigmax=1.0, sigmay=1.0, mux=0.0, muy=0.0, sigmaxy=0.0)
 
