@@ -25,8 +25,8 @@ predict, or simply interact in. We can perform actions, and access
 (partial) observations.
 '''
 maxPlaneStartDist = 8
-numAngs = 2 # Discretizing allowed turning directions into this many chunks
-numDist = 10 # Discretizing distances from center into this many chunks
+numAngs = 5 # Discretizing allowed turning directions into this many chunks
+numDist = 6 # Discretizing distances from center into this many chunks
 thermRadius = 3; # Standard deviation of reward function 
 stepSize = 0.1 #maxPlaneStartDist/(numDist-1) # Will oscillate about maximum if following a good policy
 env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)  
@@ -76,9 +76,11 @@ for i in range(numDist):
 agent = LearningAgent(table, learner)
 agent.name = 'ocelot'
 
-# Add an explorer to the learner
+# Add an explorer to the learner (use default values - this code added for clarity)
 from pybrain.rl.explorers.discrete.egreedy import EpsilonGreedyExplorer
-agent.explorer = EpsilonGreedyExplorer()
+eps = 0.3
+epsDecay = 0.9999
+agent.explorer = EpsilonGreedyExplorer(eps,epsDecay)
 
 
 # We now to need to make an experiment
@@ -106,7 +108,7 @@ print('\n\n Begin learning.\n\n')
 # Learn!
 
 # Reset the plane to its starting point trainEpochs times
-trainEpochs = 10
+trainEpochs = 50
 for j in range(trainEpochs):
     # Reset the experiment, keeping the learned information
     env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
@@ -114,8 +116,8 @@ for j in range(trainEpochs):
     experiment = Experiment(task, agent)
 
     # Repeat the interaction - learn cycle several times
-    numTrain = 50;
-    numInterPerTrain = 50;
+    numTrain = 20;
+    numInterPerTrain = 20;
     for i in range(numTrain):
         '''print('Position of plane:')
         print(env.distPlane())
@@ -140,23 +142,29 @@ for i in range(numDist):
 print('\n\n')
 print('Hit ENTER to begin testing.\n\n')
 input()
-testIter = 100
-# Move the plane back to the start by restting the environment
-agent.explorer.epsilon = 0 # Turn off exploration
 
+# Turn off exploration
+learner._setExplorer(EpsilonGreedyExplorer(0))
+agent = LearningAgent(table, learner)
+
+# Move the plane back to the start by resetting the environment
 env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
 task = SimpThermTask(env)
 experiment = Experiment(task, agent)
 
 
+# Breakpoint code: import pdb; pdb.set_trace()    
 
-
+testIter = 100
 trainResults = [env.distPlane()]
 for i in range(testIter):
-    print('Pos:',env.distPlane())  
+    print('Pos:',env.distPlane()) 
+    
     experiment.doInteractions(1) 
     trainResults.append(env.distPlane())
 
+import sys; sys.stdout.flush();
+    
 # Plot the training results
 import matplotlib.pyplot as plt
 plt.plot(trainResults,'o')

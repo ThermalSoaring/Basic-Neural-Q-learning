@@ -63,8 +63,7 @@ class simpThermEnvironment(Environment):
             distIndex = self.numDist - 1
         else:
             #print('Unrounded distIndex:', (distToCent/outBound)*(self.numDist-2))
-            distIndex = floor((distToCent/(outBound/(self.numDist-1))))  
-        
+            distIndex = floor((distToCent/(outBound/(self.numDist-1))))
         return [distIndex]
 
     # Performs a provided action
@@ -85,6 +84,10 @@ class simpThermEnvironment(Environment):
         # Index 0           ->      0 radians
         # Index last (n)    ->      pi radians
         # Index a           ->      a/n*pi radians = a/(numAngles-1)*pi
+        
+        # Check:  (with three choices)
+        # action 0 -> 0 radians
+        # action 1 -> 1/(2)*pi        
         theta = self.action/(self.numAngles-1)*pi;
         stepSize = self.stepSize
                         
