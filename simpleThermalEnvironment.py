@@ -21,7 +21,7 @@ class simpThermEnvironment(Environment):
     indim = 1 
     
     # The number of sensor values the environment produces
-    # Distance to center of goodness function is provided (where is reward provided?)
+    # Distance to estimated center of thermal is currently provided
     outdim = 1
 
     # We set the distance of the plane from the center of the thermal randomly
@@ -51,7 +51,7 @@ class simpThermEnvironment(Environment):
         self.delay = False
 
     def getSensors(self):
-        """ Returns goodness of location after action is carried out.
+        """ Returns distance to center of thermal after action is carried out
         """        
         # Subdivide 0-5 using all but one indices, and use the last index as a catch all for 5-inf
         # Catch all: last idnex (since zero indexed, is numDist - 1)

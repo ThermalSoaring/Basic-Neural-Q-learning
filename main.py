@@ -1,7 +1,7 @@
 # David Egolf
 # For senior project
 # March 2016
-# Based on example td.py
+# Based on example td.py from the PyBrain library
 
 import sys # Allows us to force printing
 import simpleThermal as simpTh # Contains easy to use Gaussian function
@@ -25,8 +25,8 @@ predict, or simply interact in. We can perform actions, and access
 (partial) observations.
 '''
 maxPlaneStartDist = 8
-numAngs = 5 # Discretizing allowed turning directions into this many chunks
-numDist = 6 # Discretizing distances from center into this many chunks
+numAngs = 15 # Discretizing allowed turning directions into this many chunks
+numDist = 10 # Discretizing distances from center into this many chunks
 thermRadius = 3; # Standard deviation of reward function 
 stepSize = 0.1 #maxPlaneStartDist/(numDist-1) # Will oscillate about maximum if following a good policy
 env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)  
@@ -34,18 +34,6 @@ env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,
 # Print starting distance 
 print('Start distance:')
 print(env.distPlane())
-
-# Test out the environment - command the plane to move towards the center or away
-'''
-for x in range(0, 5):
-    # Move the plane towards the thermal
-    # Setting theta = 0 moves it directly towards, theta = 1 moves it away
-    theta = 0
-    env.performAction(theta)
-    
-    # Print the new distance to the center
-    print(env.distPlane())
-'''
   
 # Define an learning agent
 # A learning agent is an agent:
@@ -82,7 +70,6 @@ eps = 0.3
 epsDecay = 0.9999
 agent.explorer = EpsilonGreedyExplorer(eps,epsDecay)
 
-
 # We now to need to make an experiment
 # An agent requries both a task and a learning agent
 from pybrain.rl.experiments import Experiment
@@ -108,7 +95,7 @@ print('\n\n Begin learning.\n\n')
 # Learn!
 
 # Reset the plane to its starting point trainEpochs times
-trainEpochs = 50
+trainEpochs = 60
 for j in range(trainEpochs):
     # Reset the experiment, keeping the learned information
     env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
@@ -116,8 +103,8 @@ for j in range(trainEpochs):
     experiment = Experiment(task, agent)
 
     # Repeat the interaction - learn cycle several times
-    numTrain = 20;
-    numInterPerTrain = 20;
+    numTrain = 30;
+    numInterPerTrain = 30;
     for i in range(numTrain):
         '''print('Position of plane:')
         print(env.distPlane())
@@ -135,7 +122,7 @@ for j in range(trainEpochs):
         #    print(table.getActionValues(i))
         #print('\n')
     
-# Test!
+# Print the lookup table of state-action values
 print('Learned state-action values:')
 for i in range(numDist):
     print(table.getActionValues(i))
@@ -143,42 +130,123 @@ print('\n\n')
 print('Hit ENTER to begin testing.\n\n')
 input()
 
-# Turn off exploration
-learner._setExplorer(EpsilonGreedyExplorer(0))
-agent = LearningAgent(table, learner)
+# An example table of state-action values
+'''
+[ 13.29015278  12.41753131  12.39088926  12.60219653]
+[ 12.19686764   8.51269625   8.75278271   8.51839986]
+[ 10.80527491   6.78973061   4.18381077   4.66433501]
+[ 4.17227096  0.49664927  0.49982134  0.49814968]
+[ 0.5  0.5  0.5  0.5]
+'''
 
-# Move the plane back to the start by resetting the environment
-env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
-task = SimpThermTask(env)
-experiment = Experiment(task, agent)
+# Using the look-up table, have the plane move to the high reward area
+testTable = True
+if (testTable):
+    # Turn off exploration
+    learner._setExplorer(EpsilonGreedyExplorer(0))
+    agent = LearningAgent(table, learner)
 
+    # Move the plane back to the start by resetting the environment
+    env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
+    task = SimpThermTask(env)
+    experiment = Experiment(task, agent)
 
-# Breakpoint code: import pdb; pdb.set_trace()    
-
-testIter = 100
-trainResults = [env.distPlane()]
-for i in range(testIter):
-    print('Pos:',env.distPlane()) 
+    # Have the plane move 100 times, and plot the position of the plane (hopefully it moves to the high reward area)
+    # Breakpoint code: import pdb; pdb.set_trace()    
+    testIter = 100
+    trainResults = [env.distPlane()]
+    for i in range(testIter):
+        #print('Pos:',env.distPlane()) 
+        
+        experiment.doInteractions(1) 
+        trainResults.append(env.distPlane())
     
-    experiment.doInteractions(1) 
-    trainResults.append(env.distPlane())
-
-import sys; sys.stdout.flush();
+    import sys; sys.stdout.flush();
+        
+    # Plot the training results
+    import matplotlib.pyplot as plt
+    plt.figure(1)
+    plt.plot(trainResults,'o')
+    plt.ylabel('Distance from center of thermal')
+    plt.xlabel('Interaction iteration')
+    plt.title('Test Results for SARSA Table Based Learner')
     
-# Plot the training results
-import matplotlib.pyplot as plt
-plt.plot(trainResults,'o')
-plt.ylabel('Distance from center of thermal')
-plt.xlabel('Interaction iteration')
-plt.title('Test Results for SARSA Table Based Learner')
-plt.show()
  
+# Create a neural network using the lookup table
+# Given a state (which may include several inputs, such as distance to thermal), its activation is a tuple that estimates the value of each action in that state
+# We train it using the lookup table generated above, for the moment
+## This training data is stored in "table"
 
+from pybrain.datasets import SupervisedDataSet
+
+# Set up form of training data
+numInput = 1        # Number of input features
+numOutput = numAngs # Number of actions we want values for (directions we could travel in)
+ds = SupervisedDataSet(numInput, numOutput) 
+
+# Add items to the training dataset
+for i in range(numDist):
+    inData = tuple([i]) # i is the index of the distance chunk we are from the estimated center of thermal (higher i = larger distance)
+    outData = tuple(table.getActionValues(i))
+    # Add the data to the datasets
+    ds.appendLinked(inData,outData)
+
+# Build a feed forward neural network (with a single hidden layer)
+from pybrain.structure import SigmoidLayer, LinearLayer
+from pybrain.tools.shortcuts import buildNetwork
+numHidden = 30
+net = buildNetwork(ds.indim, 	# Number of input units
+                   numHidden, 	# Number of hidden units
+                   ds.outdim, 	# Number of output units
+                   bias = True,
+                   hiddenclass = SigmoidLayer,
+                   outclass = LinearLayer # Allows for a large output
+                   )	   
+#----------
+# Train network
+#----------
+from pybrain.supervised.trainers import BackpropTrainer
+trainer = BackpropTrainer(net, ds, verbose = True)
+trainer.trainUntilConvergence(maxEpochs = 100)
     
+print(ds)
 
+# Print the activation of the network in the different states
+# Ideally, this should be very similar to the "table" object trained using Q learning
+for i in range(numDist):
+    print(net.activate([i]))
 
+testNet = True
+if (testNet):
+    # Turn off exploration
+    learner._setExplorer(EpsilonGreedyExplorer(0))
+    #agent = LearningAgent(table, learner)
+    agent = LearningAgent(net, learner) # This probably won't work
+    
+    # Move the plane back to the start by resetting the environment
+    env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
+    task = SimpThermTask(env)
+    experiment = Experiment(task, agent)
 
+    # Have the plane move 100 times, and plot the position of the plane (hopefully it moves to the high reward area)
+    # Breakpoint code: import pdb; pdb.set_trace()    
+    testIter = 100
+    trainResults = [env.distPlane()]
+    for i in range(testIter):
+        #print('Pos:',env.distPlane()) 
+        
+        #import pdb; pdb.set_trace() # breakpoint
+        experiment.doInteractions(1) 
+        trainResults.append(env.distPlane())        
 
+    import sys; sys.stdout.flush();
+        
+    # Plot the training results
+    import matplotlib.pyplot as plt
+    plt.figure(2)
+    plt.plot(trainResults,'o')
+    plt.ylabel('Distance from center of thermal')
+    plt.xlabel('Interaction iteration')
+    plt.title('UAV Following Neural Network Trained from SARSA Table')
 
-
-
+plt.show()
