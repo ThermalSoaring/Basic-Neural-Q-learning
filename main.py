@@ -18,6 +18,17 @@ import matplotlib.pyplot as plt
 from pybrain.rl.agents import LearningAgent
 from pybrain.rl.learners.valuebased import ActionValueTable # For temporary lookup table approach to getting values for action in states
 
+# Plots decision regions:
+# There are numDist chunks, so we need numDist - 1 lines to separate these chunks
+# If we had 4 chunks, we have the one catch all and then 3 closer chunks, the first at outBound/3 = outBound/(numDist - 1)
+# The last is at 2*outBound/(numDist - 1). We also have a line at outBound.    
+def drawChunks(outBound, numDist):
+    plt.axhline(y=outBound,linewidth=1, color='r')    
+    firstLine = outBound/(numDist - 1)
+    for i in range(numDist - 2):
+        plt.axhline(y=firstLine*(i+1),linewidth=1, color='r')  
+
+
 # Create environment
 ''' 
 Environment: The general interface for whatever we would like to model, learn about,
@@ -25,8 +36,8 @@ predict, or simply interact in. We can perform actions, and access
 (partial) observations.
 '''
 maxPlaneStartDist = 8
-numAngs = 15 # Discretizing allowed turning directions into this many chunks
-numDist = 10 # Discretizing distances from center into this many chunks
+numAngs = 6 # Discretizing allowed turning directions into this many chunks
+numDist = 6 # Discretizing distances from center into this many chunks
 thermRadius = 3; # Standard deviation of reward function 
 stepSize = 0.1 #maxPlaneStartDist/(numDist-1) # Will oscillate about maximum if following a good policy
 env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)  
@@ -60,8 +71,11 @@ table.initialize(0.5) # Set initial positive value to all actions in all states 
 for i in range(numDist):
     print(table.getActionValues(i))
 
+   
 # Create a learning agent, using both the module and the learner
-agent = LearningAgent(table, learner)
+from learnerCustom import CustLearningAgent
+#agent = LearningAgent(table, learner)
+agent = CustLearningAgent(table, learner)
 agent.name = 'ocelot'
 
 # Add an explorer to the learner (use default values - this code added for clarity)
@@ -144,7 +158,8 @@ testTable = True
 if (testTable):
     # Turn off exploration
     learner._setExplorer(EpsilonGreedyExplorer(0))
-    agent = LearningAgent(table, learner)
+    agent = CustLearningAgent(table, learner)    
+    #agent = LearningAgent(table, learner)
 
     # Move the plane back to the start by resetting the environment
     env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
@@ -170,6 +185,7 @@ if (testTable):
     plt.ylabel('Distance from center of thermal')
     plt.xlabel('Interaction iteration')
     plt.title('Test Results for SARSA Table Based Learner')
+    drawChunks(maxPlaneStartDist*1.5, numDist) 
     
  
 # Create a neural network using the lookup table
@@ -194,14 +210,15 @@ for i in range(numDist):
 # Build a feed forward neural network (with a single hidden layer)
 from pybrain.structure import SigmoidLayer, LinearLayer
 from pybrain.tools.shortcuts import buildNetwork
-numHidden = 30
+numHidden = 20
 net = buildNetwork(ds.indim, 	# Number of input units
                    numHidden, 	# Number of hidden units
                    ds.outdim, 	# Number of output units
                    bias = True,
                    hiddenclass = SigmoidLayer,
                    outclass = LinearLayer # Allows for a large output
-                   )	   
+                   )	
+                  
 #----------
 # Train network
 #----------
@@ -212,16 +229,16 @@ trainer.trainUntilConvergence(maxEpochs = 100)
 print(ds)
 
 # Print the activation of the network in the different states
-# Ideally, this should be very similar to the "table" object trained using Q learning
+# Ideally, this should be very similar to the "table" object trained using SARSA learning
 for i in range(numDist):
     print(net.activate([i]))
 
+    
 testNet = True
 if (testNet):
     # Turn off exploration
     learner._setExplorer(EpsilonGreedyExplorer(0))
-    #agent = LearningAgent(table, learner)
-    agent = LearningAgent(net, learner) # This probably won't work
+    agent = CustLearningAgent(net, learner)
     
     # Move the plane back to the start by resetting the environment
     env = thermEnv.simpThermEnvironment(maxPlaneStartDist, stepSize,numAngs,numDist,thermRadius)
@@ -233,13 +250,10 @@ if (testNet):
     testIter = 100
     trainResults = [env.distPlane()]
     for i in range(testIter):
-        #print('Pos:',env.distPlane()) 
-        
-        #import pdb; pdb.set_trace() # breakpoint
         experiment.doInteractions(1) 
-        trainResults.append(env.distPlane())        
+        trainResults.append(env.distPlane())       
 
-    import sys; sys.stdout.flush();
+    import sys; sys.stdout.flush(); # Force printing
         
     # Plot the training results
     import matplotlib.pyplot as plt
@@ -248,5 +262,10 @@ if (testNet):
     plt.ylabel('Distance from center of thermal')
     plt.xlabel('Interaction iteration')
     plt.title('UAV Following Neural Network Trained from SARSA Table')
+    
+    outBound = maxPlaneStartDist*1.5   
+    drawChunks(maxPlaneStartDist*1.5, numDist)   
+    plt.show()
+    
 
-plt.show()
+

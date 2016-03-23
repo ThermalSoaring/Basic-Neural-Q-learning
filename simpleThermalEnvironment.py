@@ -53,9 +53,8 @@ class simpThermEnvironment(Environment):
     def getSensors(self):
         """ Returns distance to center of thermal after action is carried out
         """        
-        # Subdivide 0-5 using all but one indices, and use the last index as a catch all for 5-inf
-        # Catch all: last idnex (since zero indexed, is numDist - 1)
-        # Subdivide 0-5 into numDist - 1 intervals (one used for catch all)
+        # Subdivide close stuff using all but one indices, and use the last index as a catch all the rest
+        # Catch all: last index (since zero indexed, is numDist - 1)
         
         outBound = self.maxPlaneStartDist*1.5 # Beyond this distance, all values estimates get chunked together
         distToCent = self.sensors
