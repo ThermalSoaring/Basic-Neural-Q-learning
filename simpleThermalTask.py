@@ -5,7 +5,8 @@ from scipy import array, asarray
 from math import pi, sqrt, exp
 
 # This task is designed to interact with a simpThermEnvironment environment
-# When this task is created, a simpThermEnvironment environment is attached to it
+# --It will also work with contThermalEnvironment
+# When this task is created, an environment is attached to it
 # --We can refer to this environment by self.env
 
 class SimpThermTask(Task):

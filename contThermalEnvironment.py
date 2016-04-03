@@ -10,7 +10,7 @@ from scipy import eye, matrix, random, asarray
 from pybrain.rl.environments.environment import Environment
 
 
-class simpThermEnvironment(Environment):
+class contThermEnvironment(Environment):
     """ 
         Provides a simple Gaussian "goodness" function        
     """
@@ -27,7 +27,7 @@ class simpThermEnvironment(Environment):
     # We set the distance of the plane from the center of the thermal randomly
     randomInitialization = False
 
-    def __init__(self, maxPlaneStartDist, stepSize, numAngles,numDist, thermRadius):
+    def __init__(self, maxPlaneStartDist, stepSize, numAngles, thermRadius):
         # distPlaneRange specifies the maximum distance the plane can be from the center on startup
         self.maxPlaneStartDist = maxPlaneStartDist
         
@@ -35,13 +35,8 @@ class simpThermEnvironment(Environment):
         self.stepSize = stepSize
                 
         # numAngles is the number of discrete directions the plane can move
-        self.numAngles = numAngles
-        
-        # numDist is the number of distances we discretize distance from center of thermal
-        # A continuous float value is used here in environment
-        # This discretization is only for chunking state-action value estimates
-        self.numDist = numDist
-        
+        self.numAngles = numAngles        
+       
         # Sets standard deviation of normal shaped reward function
         self.thermRadius = thermRadius
         
@@ -51,20 +46,7 @@ class simpThermEnvironment(Environment):
         self.delay = False
 
     def getSensors(self):
-        """ Returns distance to center of thermal after action is carried out
-        """        
-        # Subdivide close stuff using all but one indices, and use the last index as a catch all the rest
-        # Catch all: last index (since zero indexed, is numDist - 1)
-        
-        outBound = self.maxPlaneStartDist*1.5 # Beyond this distance, all values estimates get chunked together
-        distToCent = self.sensors
-        if (distToCent > outBound):
-            distIndex = self.numDist - 1
-        else:
-            #print('Unrounded distIndex:', (distToCent/outBound)*(self.numDist-2))
-            distIndex = floor((distToCent/(outBound/(self.numDist-1))))
-                  
-        return [distIndex]
+        return [self.sensors] # Returns (unrounded) distance to center
 
     # Performs a provided action
     # The action is theta, where theta is the angle (in radians) from a line drawn from the plane to the center of the thermal
