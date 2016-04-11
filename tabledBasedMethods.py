@@ -204,7 +204,7 @@ def testTable(learner, table, env, maxPlaneStartDist, stepSize,numAngs,numDist,t
     # Build a feed forward neural network (with a single hidden layer)
     from pybrain.structure import SigmoidLayer, LinearLayer
     from pybrain.tools.shortcuts import buildNetwork
-    numHidden = 40
+    numHidden = 20
     net = buildNetwork(ds.indim, 	# Number of input units
                        numHidden, 	# Number of hidden units
                        ds.outdim, 	# Number of output units
@@ -215,7 +215,7 @@ def testTable(learner, table, env, maxPlaneStartDist, stepSize,numAngs,numDist,t
     # Train network
     from pybrain.supervised.trainers import BackpropTrainer
     trainer = BackpropTrainer(net, ds, verbose = True)
-    trainer.trainUntilConvergence(maxEpochs = 100)        
+    trainer.trainUntilConvergence(maxEpochs = 200)        
     print(ds)
 
     # Print the activation of the network in the different states
@@ -276,7 +276,7 @@ def tableBasedMethod(maxPlaneStartDist,numAngs,numDist,thermRadius,stepSize):
     # trainEpochs = the number of times the environment is reset in training
     # numTrain = number of times we do numIterPerTrain interactions before resetting
     # numIterPerTrain = number of times we interact before learning anything
-    trainEpochs = 30; numTrain = 30; numIterPerTrain = 30
+    trainEpochs = 50; numTrain = 30; numIterPerTrain = 30
     agent = learningCycle(env,agent, trainEpochs, numTrain, numIterPerTrain)
         
     table = agent.module

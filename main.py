@@ -45,13 +45,15 @@ which perturbs the actions.
 
 # dimAct    = the dimension of the action vector
 # dimState  = the dimension of the state vector (= 1 if we are only keeping track of distance to center of thermal)
-def createAgentCont(dimAct,dimState):
-    from pybrain.rl.learners import NFQ
-    learner = NFQ() # Use neuro-fitted Q learning (use Q learning with neural network instead of lookup table)    
+def createAgentCont(dimAct,dimState,numBatchToKeep, numIterPerTrain):
+    from pybrain.rl.learners import NFQ        
+    sizeBatch = numIterPerTrain
+    learner = NFQ(sizeBatch, numBatchToKeep) # Use neuro-fitted Q learning (use Q learning with neural network instead of lookup table)    
     
     # Create a neural network model with dimState inputs and dimAct outputs
     # Then network itself has dimState + dimAct input and 1 output
     numHidden = 20
+    print('Using this many hidden layer neurons: ', numHidden)
     moduleNet = ActionValueNetwork(dimState, dimAct, numHidden); moduleNet.name = 'moduleNet' 
         
     # Create a learning agent, using both the module and the learner
@@ -137,15 +139,17 @@ def learningCycle(env,agent, trainEpochs, numTrain, numIterPerTrain):
     envBackup = copy.deepcopy(env) # Make a copy of the environment to revert to
     for j in range(trainEpochs):
         print('epoch: ', j); sys.stdout.flush();
-        # Reset the environment, keeping the learned information (in the agent)
-        env = envBackup
-        experiment = createExp(envBackup, agent)
-
+        # Reset the environment, keeping the learned information (in the agent) 
+        env = copy.deepcopy(envBackup)
+        
+        experiment = createExp(env, agent)
+ 
         # Repeat the interaction - learn cycle several times
         for i in range(numTrain):
             
             # We interact with the environment without updating value estimates
             experiment.doInteractions(numIterPerTrain) 
+            
             
             # Using the data from the interactions, update value estimates in the agent's module, using the agent's learner
             agent.learn()        
@@ -191,20 +195,24 @@ def netBasedMethod(maxPlaneStartDist,numAngs,thermRadius,stepSize):
     print(env.distPlane())
 
     # Create learning agent
+    trainEpochs = 2000; numTrain = 1; numIterPerTrain = 5
+    numBatchToKeep = 3;
     dimState = 1 # Currently we only record the distance to the thermal center
-    agent = createAgentCont(numAngs, dimState)
+    agent = createAgentCont(numAngs, dimState, numBatchToKeep, numIterPerTrain)
     agent = addEpsGreedExplorer(agent)
 
     # Set optimistic initial values
-    optVal = 150
-    optLocs = range(20)
-    maxEpochs = 30
-    agent = setInitEst(optVal, optLocs, agent,maxEpochs)   
+    # optVal = 2
+    # optLocs = range(20)
+    # maxEpochs = 100
+    # agent = setInitEst(optVal, optLocs, agent,maxEpochs)   
     
-    print('Sample initial (optimistic) SA values:')
+    print('Sample initial SA values:')
     printSAValsNet(agent.module,range(20)) 
     #refState = 0; refAction = 0;
     #printSADiff(agent.module, range(20), refState, refAction)
+    
+    input()
     
     # Learning
     print('\n\n Begin learning.\n\n')
@@ -213,7 +221,7 @@ def netBasedMethod(maxPlaneStartDist,numAngs,thermRadius,stepSize):
     # trainEpochs = the number of times the environment is reset in training
     # numTrain = number of times we do numIterPerTrain interactions before resetting
     # numIterPerTrain = number of times we interact before learning anything
-    trainEpochs = 30; numTrain = 1; numIterPerTrain = 5
+    
     agent = learningCycle(env,agent, trainEpochs, numTrain, numIterPerTrain)
     
     print('Sample final SA values:')
@@ -239,13 +247,14 @@ def tableMain():
 
 # Use a neural network to store state action values
 def netMain():
-    maxPlaneStartDist = 1  # Starting plane distance from thermal, or the maximum such distance if random placement of plane is allowed
-    numAngs = 3             # The number of directions in which the plane is allowed to move
+    maxPlaneStartDist = 2  # Starting plane distance from thermal, or the maximum such distance if random placement of plane is allowed
+    numAngs = 5            # The number of directions in which the plane is allowed to move
     thermRadius = 3;        # Standard deviation of thermal
-    stepSize = 0.3          # How far the plane moves on each interaction
+    stepSize = 1          # How far the plane moves on each interaction
     netBasedMethod(maxPlaneStartDist,numAngs,thermRadius,stepSize)
 
-tableMain() # Works reasonably well
-#netMain()
+    
+#tableMain() # Works reasonably well
+netMain()
 
 
