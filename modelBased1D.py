@@ -1,70 +1,82 @@
+import evalPolicy as ep
+import main_modelBased as mmB
 import numpy as np
 from math import pi, cos, pow, sin, sqrt, exp
 
-# Updates distance from center of thermal
-def updateDist(oldDist, stepSize, numAng, chosenAction):
-    theta = chosenAction/(numAng-1)*pi;         
-
-    deltaTempX = oldDist - stepSize*cos(theta)
-    deltaTempY = sin(theta)*stepSize
-    newDist = sqrt(pow(deltaTempX,2)+ pow(deltaTempY,2))
-    return newDist
-
-# Update height
-def updateHeight(oldHeight, distToThermal, thermRadius):     
+# Gives reward of state transition (old code)
+def getReward1D(state, thermRadius, scale):
+    # Give a reward corresponding to how close to the thermal we are
+    # The reward follows  a normal distribution with the standard deviation of the thermal
+    distToThermal = state        
     sigma = thermRadius
-    thermBoost = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal,2)/(2*pow(sigma,2))) 
-    return (oldHeight + thermBoost)
+    reward = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal,2)/(2*pow(sigma,2)))  
+    return scale*reward
     
-# Update both distance and height
-def updateState(oldState, stepSize, numAng, chosenAction, thermRadius):
-    oldDist = oldState[0]
-    newDist = updateDist(oldDist, stepSize, numAng, chosenAction)
+# Make policy greedy with respect to current value net (old code)
+def makeGreedy1D(valNet, polNet, policyEvalStates, numAct, stepSize):
+
+    from pybrain.datasets import SupervisedDataSet                
+    supervised = SupervisedDataSet(polNet.indim, numAct) # numInput, numOutputs   
     
-    oldHeight = oldState[1]
-    newHeight = updateHeight(oldHeight, oldDist, thermRadius)
+    # Try all the actions and see which has the best value    
+    for state in policyEvalStates:
+        vBest = -100000
+        for action in range(numAct):            
+            nextState = [ep.updateDist(state, stepSize, numAct, action)]
+            vNext = valNet.activate(nextState)
+            if (vNext > vBest):
+                actBest = action
+                vBest = vNext
+        from pybrain.utilities import one_to_n
+        supervised.addSample(state, one_to_n(actBest, numAct))
     
-    return [newDist, newHeight]   
+    # Print supervised training set 
+    # print(supervised)
+    # input()
     
-def getReward(state, scale):
-    # Give a reward corresponding to our height    
-    currHeight = state[1]
-    return scale*currHeight
-       
-# Make values consistent with policy
-def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
+    # Train neural network
+    from pybrain.supervised.trainers.rprop import RPropMinusTrainer                
+    trainer = RPropMinusTrainer(polNet, dataset=supervised, verbose=False)  
+    trainer.trainUntilConvergence(maxEpochs=50) # I'm OK with some interpolation here. It's the values we need to be exact on.
+    return polNet
+    
+# Updates estimates of values of states(old code)
+def evalPolicy1D(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
     vDiffStart = 10000
     vDiff = vDiffStart    
     while(vDiff > vMaxAll):
         vDiff = vDiffStart
         
-        for state in policyEvalStates: # Go through the states in the discretization 
+        for state in policyEvalStates: # Go through the states in question  
+
         
                 # Stores next state according to the current policy
                 nextState = [];
 
                 # Determine what the chosen action is, from the policy network
-                actionPref = polNet.activate(state)               
-                chosenAction = np.argmax(actionPref) # Choose the one with highest output   
+                actionPref = polNet.activate([state])               
+                chosenAction = np.argmax(actionPref) # Choose the one with highest output
+                
                 
                 # Determine the next state (from contThermalEnvironment)
-                numAng = len(actionPref)                
-                nextState = updateState(state, stepSize, numAng, chosenAction, thermRadius)
-                                
+                numAng = len(actionPref)
+                oldDist = state
+                nextState = [ep.updateDist(oldDist, stepSize, numAng, chosenAction)]   
+                
                 # Calculate reward given for transition                
                 
                 # Calculate new value of states under the current policy, based on reward given
                 # Discount rate is how farsighted we are (between 0 and 1, with 1 being very far sighted, and 0 being not far sighted)
                 discRate = 0.7
-                scale = 1 # Size of reward
-                reward = getReward(nextState, scale)    
+                scale = 10 # Size of reward
+                reward = getReward1D(state, thermRadius,scale)
                 
                 # Calculate new estimate for value 
                 VstateNew = reward + discRate*valNet.activate(nextState);       
                 
                 # Determine how much the value changed
                 # Keep track of maximum change seen so far
-                VstateOld = valNet.activate(state)
+                VstateOld = valNet.activate([state])
                 vChange = abs(VstateOld - VstateNew)
                 if (vDiff == vDiffStart):
                     vDiff = vChange
@@ -80,7 +92,7 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
                 for loc in policyEvalStates: # Go through all discretized states 
                     if (loc != state):
                         inp = loc
-                        tgt = valNet.activate(loc)
+                        tgt = valNet.activate([loc])
                         supervised.addSample(inp,tgt)
                         
                 # Next, train on these training examples
@@ -95,10 +107,10 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
                     trainer.train()                
 
                 # Print training status
-                # print('Old state:', state)
+                # print('Old dist:', oldDist)
                 # print('Preferences:', actionPref)
                 # print('Choice:', chosenAction)
-                # print('New state:', nextState)
+                # print('New dist:', nextState)
                 # print('Reward:', reward)
                 # print('New Value:', VstateNew)
                 # print('Value change:', vChange)
@@ -107,7 +119,7 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
                 
                 # print('Actual network outputs:')
                 # for loc in policyEvalStates:
-                    # print(valNet.activate(loc))
+                    # print(valNet.activate([loc]))
                 
                 # input()
                 
@@ -115,7 +127,5 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
         print('Max value change: ', vDiff)
         import sys ;sys.stdout.flush()
         
-    return valNet    
-    
-    
-    
+    return valNet
+
