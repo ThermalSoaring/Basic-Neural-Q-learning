@@ -18,11 +18,11 @@ import numpy as np
 # Input: state variables
 # Output: value of state
 def createValNetwork(dimState, numHidden):
-    # Build a feed forward neural network (with a single hidden layer)
+    # Build a feed forward neural network (with one hidden layer)
     from pybrain.structure import SigmoidLayer, LinearLayer
     from pybrain.tools.shortcuts import buildNetwork
     valNet = buildNetwork(dimState, # Number of input units
-                       numHidden, 	# Number of hidden units
+                       numHidden,   # Number of hidden units 
                        1, 	        # Number of output units
                        bias = True,
                        hiddenclass = SigmoidLayer,
@@ -44,17 +44,18 @@ def createPolNetwork(dimState, numHidden, numAct):
                        outclass=SoftmaxLayer # Outputs are in (0,1), and add to 1
                        )	
     return polNet
-    
+             
 def mainModelBased():
     # 1. Create a random value function
     dimState = 1 # Number of state variables
     numHiddenVal = 20 # Number of hidden neurons
-    valNet = createValNetwork(dimState,numHiddenVal)    
+    valNet = createValNetwork(dimState,numHiddenVal)  # Using two hidden layers for precision  
     
     # 2. Create a random policy network
-    numHiddenPol = 20
-    numAct = 4
-    polNet = createPolNetwork(dimState, numHiddenPol, numAct)    
+    numHiddenPol = 20 # Number of hidden neurons
+    numAct = 10 # Number of actions
+    polNet = createPolNetwork(dimState, numHiddenPol, numAct)       
+    
     
     # 3. Update values based on current policy
     # The policy is greedy with respect to the value estimates
@@ -67,14 +68,33 @@ def mainModelBased():
     stop = 10    
     policyEvalStates = np.linspace(start, stop, num=10) # Will need to be extended for more state variables
     
-    import evalPolicy
-    vMaxAll = 0.05 # We require values to stop changing by any more than this amount before we return the updated values
-    stepSize = 0.5 # How far the airplane moves each time (needed to predict next state)
-    thermRadius = 3 # Standard deviation of normal shaped thermal
-    evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll, stepSize, thermRadius)
+    # Print initial policy
+    print('Initial policy:')
+    for state in policyEvalStates:
+        print(np.argmax(polNet.activate([state])))       
     
-    # 4. Update policy based on current values 
-
+    # Make values consistent with policy
+    import evalPolicy
+    vMaxAll = 0.5 # We require values to stop changing by any more than this amount before we return the updated values
+    stepSize = 0.5 # How far the airplane moves each time (needed to predict next state)
+    thermRadius = 3 # Standard deviation of normal shaped thermal   
+    
+    numLearn = 3 # Number of times to repaet learning cycle
+    
+    for i in range(numLearn):
+        valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll, stepSize, thermRadius)
+        
+        # Print new value network on selected points
+        print('Updated value function:')
+        for state in policyEvalStates:
+            print(valNet.activate([state]))        
+        
+        # 4. Update policy based on current values 
+        polNet = evalPolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize)
+        print('Updated policy:')
+        for state in policyEvalStates:
+            print(np.argmax(polNet.activate([state])))
+        
 mainModelBased()
 
 
