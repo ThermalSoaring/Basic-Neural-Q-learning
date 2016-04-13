@@ -2,24 +2,37 @@ import numpy as np
 from math import pi, cos, pow, sin, sqrt, exp
 
 # Updates distance from center of thermal
-def updateDist(oldDist, stepSize, numAng, chosenAction):
-    theta = chosenAction/(numAng-1)*pi;         
+def updateDist(oldDist, stepSize, numAct, chosenAction):
+    # If 11 actions, 10 are direction movement actions -> action 10 is orbit
+    if (chosenAction == numAct - 1):
+        newDist = oldDist # Orbiting
+    else:
+        numAng = numAct - 1 # Subtract orbit command
+        theta = chosenAction/(numAng-1)*pi;         
 
-    deltaTempX = oldDist - stepSize*cos(theta)
-    deltaTempY = sin(theta)*stepSize
-    newDist = sqrt(pow(deltaTempX,2)+ pow(deltaTempY,2))
+        deltaTempX = oldDist - stepSize*cos(theta)
+        deltaTempY = sin(theta)*stepSize
+        newDist = sqrt(pow(deltaTempX,2)+ pow(deltaTempY,2))
     return newDist
 
 # Update height
 def updateHeight(oldHeight, distToThermal, thermRadius):     
+    # Gaussian shaped thermal
+    #sigma = thermRadius
+    #thermBoost = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal,2)/(2*pow(sigma,2))) 
+    
+    # Ring shaped thermal
+    drop = 0.05 # Realize the plane will tend to fall
+    shift = 5; # Where to put the center of boost, relative to center of thermal
     sigma = thermRadius
-    thermBoost = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal,2)/(2*pow(sigma,2))) 
-    return (oldHeight + thermBoost)
+    thermBoost = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal-shift,2)/(2*pow(sigma,2)))   
+
+    return (oldHeight + thermBoost - drop)
     
 # Update both distance and height
-def updateState(oldState, stepSize, numAng, chosenAction, thermRadius):
+def updateState(oldState, stepSize, numAct, chosenAction, thermRadius):
     oldDist = oldState[0]
-    newDist = updateDist(oldDist, stepSize, numAng, chosenAction)
+    newDist = updateDist(oldDist, stepSize, numAct, chosenAction)
     
     oldHeight = oldState[1]
     newHeight = updateHeight(oldHeight, oldDist, thermRadius)
@@ -48,8 +61,8 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
                 chosenAction = np.argmax(actionPref) # Choose the one with highest output   
                 
                 # Determine the next state (from contThermalEnvironment)
-                numAng = len(actionPref)                
-                nextState = updateState(state, stepSize, numAng, chosenAction, thermRadius)
+                numAct = len(actionPref)                
+                nextState = updateState(state, stepSize, numAct, chosenAction, thermRadius)
                                 
                 # Calculate reward given for transition                
                 

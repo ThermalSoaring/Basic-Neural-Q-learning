@@ -105,7 +105,8 @@ def mainModelBased():
     
     # 2. Create a random policy network
     numHiddenPol = 20 # Number of hidden neurons
-    numAct = 10 # Number of actions
+    numAng = 2
+    numAct = numAng + 1 # Number of actions (additional action is for orbit)
     polNet = createPolNetwork(dimState, numHiddenPol, numAct)       
     
     
@@ -118,8 +119,8 @@ def mainModelBased():
     # Here we set the states used to update the policy
     start = 0
     stop = 10    
-    evalDist = np.linspace(start, stop, num=3)
-    evalHeight = np.linspace(start, stop, num=2)
+    evalDist = np.linspace(start, stop, num=7)
+    evalHeight = np.linspace(start, stop, num=1)
     
     import itertools
     policyEvalStates = list(itertools.product(evalDist,evalHeight)) # Takes cartesian product
@@ -132,11 +133,11 @@ def mainModelBased():
     
     # Make values consistent with policy
     import evalPolicy
-    vMaxAll = 0.5 # We require values to stop changing by any more than this amount before we return the updated values
-    stepSize = 0.5 # How far the airplane moves each time (needed to predict next state)
+    vMaxAll = 0.1 # We require values to stop changing by any more than this amount before we return the updated values
+    stepSize = 0.1 # How far the airplane moves each time (needed to predict next state)
     thermRadius = 3 # Standard deviation of normal shaped thermal   
     
-    numLearn = 10 # Number of times to repaet learning cycle
+    numLearn = 100 # Number of times to repeat learning cycle
     
     for i in range(numLearn):   
         valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll, stepSize, thermRadius)
