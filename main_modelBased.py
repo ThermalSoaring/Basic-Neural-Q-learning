@@ -77,7 +77,7 @@ def mainModelBased1D():
     # Make values consistent with policy
     import evalPolicy
     vMaxAll = 0.5 # We require values to stop changing by any more than this amount before we return the updated values
-    stepSize = 0.5 # How far the airplane moves each time (needed to predict next state)
+    stepSize = 0.1 # How far the airplane moves each time (needed to predict next state)
     thermRadius = 3 # Standard deviation of normal shaped thermal   
     
     numLearn = 3 # Number of times to repaet learning cycle
@@ -96,17 +96,74 @@ def mainModelBased1D():
         print('Updated policy:')
         for state in policyEvalStates:
             print(np.argmax(polNet.activate([state])))
+
+# Plot estimated value function 
+# evalDir = list of directions we can travel in
+def graphValues(valNet, evalDir):
+    import matplotlib.pyplot as plt
+    start = 0; stop = 10;
+    dist = np.linspace(start, stop, num=60)
+    
+    valTowards = []     # Value if moving towards center
+    valAway = []        # Value if moving away from center
+    for pos in dist:
+        height = 0
+        towardsCent = 0
+        valTowards.append(valNet.activate([pos, height, towardsCent])[0])
+        if (len(evalDir) > 1):
+            awayFromCent = 1
+            valAway.append(valNet.activate([pos, height, awayFromCent])[0])        
+    plt.plot(dist,valTowards, label = 'Facing towards')
+    if(len(evalDir) > 1):
+        plt.plot(dist,valAway, label = 'Facing away')
+    plt.xlabel('Distance')
+    plt.ylabel('Value')
+    plt.title('Approximated Value Function, with Neural Interpolation')
+    #plt.legend()
+
+    plt.draw()
+    # plt.waitforbuttonpress(timeout=0.001)
+
+def graphPolicy(polNet):
+    import matplotlib.pyplot as plt
+    start = 0; stop = 10;
+    dist = np.linspace(start, stop, num=60) # Where to evaluate policy
+    
+    prefToward = []
+    prefAway = []
+    preOrb = []
+    for pos in dist:
+        height = 0
+        towardsCent = 0
+        preferences = polNet.activate([pos, height, towardsCent])
+        prefToward.append(preferences[0])  
+        prefAway.append(preferences[1])      
+        preOrb.append(preferences[2])   
+    plt.plot(dist,prefToward, label = 'Move towards')
+    plt.plot(dist,prefAway, label = 'Move away')
+    plt.plot(dist,preOrb, label = 'Orbit')
+    plt.xlabel('Distance')
+    plt.ylabel('Preference')
+    
+    plt.ylim([-0.1,1.1])
+    
+    plt.title('Policy, with Neural Interpolation')
+    plt.legend()
+
+    plt.draw()
+    # plt.waitforbuttonpress(timeout=0.001)
     
 def mainModelBased():
     # 1. Create a random value function
-    dimState = 2 # Number of state variables (position from thermal, height)
+    dimState = 3 # Number of state variables used in discretized training examples (position from thermal, height, direction (towards or away center))
     numHiddenVal = 20 # Number of hidden neurons
     valNet = createValNetwork(dimState,numHiddenVal)  # Using two hidden layers for precision  
     
     # 2. Create a random policy network
     numHiddenPol = 20 # Number of hidden neurons
-    numAng = 2
-    numAct = numAng + 1 # Number of actions (additional action is for orbit)
+    numAng = 2 # Towards or away from thermal center   
+    # numAct = numAng # If no orbiting
+    numAct = numAng + 1 # Number of actions (additional action is for orbit - preserve distance from center)
     polNet = createPolNetwork(dimState, numHiddenPol, numAct)       
     
     
@@ -119,11 +176,12 @@ def mainModelBased():
     # Here we set the states used to update the policy
     start = 0
     stop = 10    
-    evalDist = np.linspace(start, stop, num=7)
-    evalHeight = np.linspace(start, stop, num=1)
+    evalDist = np.linspace(start, stop, num=15)
+    evalHeight = np.linspace(start, stop, num=1) # Avoid segmenting on height until shown to be necessary
+    evalDir = [0]#[0,1] # 0 is pointing towards thermal center, 1 is pointing away from thermal center
     
     import itertools
-    policyEvalStates = list(itertools.product(evalDist,evalHeight)) # Takes cartesian product
+    policyEvalStates = list(itertools.product(evalDist,evalHeight, evalDir)) # Takes cartesian product
     
     # Print initial policy
     print('Initial policy:')
@@ -131,17 +189,20 @@ def mainModelBased():
     for state in policyEvalStates:
         print(np.argmax(polNet.activate(state)), '\t', state)   
     
+    import sys; sys.stdout.flush()
+    
+    
     # Make values consistent with policy
     import evalPolicy
-    vMaxAll = 0.1 # We require values to stop changing by any more than this amount before we return the updated values
+    vMaxAll = 0.5 # We require values to stop changing by any more than this amount before we return the updated values
     stepSize = 0.1 # How far the airplane moves each time (needed to predict next state)
     thermRadius = 3 # Standard deviation of normal shaped thermal   
     
-    numLearn = 100 # Number of times to repeat learning cycle
+    numLearn = 1000 # Number of times to repeat learning cycle
     
     for i in range(numLearn):   
         valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll, stepSize, thermRadius)
-        
+                
         # Print new value network on selected points
         print('Updated value function:')
         print('Value \t State')
@@ -155,6 +216,24 @@ def mainModelBased():
         print('Choice \t State')
         for state in policyEvalStates:
             print(np.argmax(polNet.activate(state)), '\t', state)   
+            
+        # Display the estimated value function and policy
+        clearPeriod = 1
+        if (i == 0): 
+            import matplotlib.pyplot as plt
+            plt.figure()        
+            # Maximize the window
+            figManager = plt.get_current_fig_manager()
+            figManager.window.showMaximized()         
+        if (i % clearPeriod == 0 and i != 0):
+            plt.clf()
+        plt.subplot(2, 1, 1)        
+        graphValues(valNet, evalDir)
+        
+        plt.subplot(2, 1, 2) 
+        graphPolicy(polNet)        
+        
+        plt.waitforbuttonpress(timeout=0.001)
 
 #mainModelBased1D() # Only keeps track of distance to thermal
 mainModelBased()
