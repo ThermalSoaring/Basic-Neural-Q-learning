@@ -53,6 +53,11 @@ def updateState(oldState, stepSize, numAct, chosenAction, thermRadius):
     newDist = updateDist(oldDist, stepSize, numAct, chosenAction)
     
     oldHeight = oldState[1]
+    
+    # Update height based on new position (seems conceptually good, but breaks things)
+    # newHeight = updateHeight(oldHeight, newDist, thermRadius)
+    
+    # Updates height based on old distance:
     newHeight = updateHeight(oldHeight, oldDist, thermRadius)
     
     tempState = [newDist, newHeight, oldState[2]]
