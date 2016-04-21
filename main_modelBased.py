@@ -99,7 +99,7 @@ def mainModelBased1D():
 
 # Plot estimated value function 
 # evalDir = list of directions we can travel in
-def graphValues(valNet, evalDir, policyEvalStates):
+def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, maxX):
     import matplotlib.pyplot as plt
     start = 0; stop = 10;
     dist = np.linspace(start, stop, num=60)
@@ -108,7 +108,7 @@ def graphValues(valNet, evalDir, policyEvalStates):
     
     # Determine value at multiple heights
     heightInd = 0
-    for height in [0, 0.2, -0.2]:        
+    for height in [0.5, 0.2, 0, -0.2, -0.5]:        
         valList.append([])
         for pos in dist:              
             towardsCent = 0
@@ -117,9 +117,25 @@ def graphValues(valNet, evalDir, policyEvalStates):
         plt.plot(dist,valList[heightInd], label = height)
         heightInd = heightInd + 1
     plt.legend()
+    plt.xlim([0,maxX])
     plt.xlabel('Distance')
     plt.ylabel('Value')
     plt.title('Approximated Value Function, with Neural Interpolation')
+    
+    # Plot data used to train policy network
+    trainValToPlot = []
+    trainDistToPlot = []
+    i = 0
+    heightPlot = 0 # Plot only training examples at zero height
+    
+    # Plot data used for training policy network
+    for state in nextStateList:
+        #if (state[1] == heightPlot):
+        trainValToPlot.append(nextValList[i])
+        trainDistToPlot.append(state[0])
+        i = i + 1
+    plt.plot(trainDistToPlot, trainValToPlot, 'o')
+    #import pdb; pdb.set_trace()
     
     # Indicate where our training examples are
     for state in policyEvalStates:
@@ -128,10 +144,9 @@ def graphValues(valNet, evalDir, policyEvalStates):
     
     #plt.legend()
 
-    plt.draw()
-    # plt.waitforbuttonpress(timeout=0.001)
+    plt.draw()   
 
-def graphPolicy(polNet, policyEvalStates):
+def graphPolicy(polNet, policyEvalStates, actList, maxX):
     import matplotlib.pyplot as plt
     start = 0; stop = 10;
     dist = np.linspace(start, stop, num=60) # Where to evaluate policy
@@ -139,6 +154,7 @@ def graphPolicy(polNet, policyEvalStates):
     prefToward = []
     prefAway = []
     preOrb = []
+    # Print how much we like the different actions
     for pos in dist:
         height = 0
         towardsCent = 0
@@ -151,7 +167,7 @@ def graphPolicy(polNet, policyEvalStates):
     plt.plot(dist,preOrb, label = 'Orbit')
     plt.xlabel('Distance')
     plt.ylabel('Preference')
-    
+    plt.xlim([0,maxX])
     plt.ylim([-0.1,1.1])
     
     plt.title('Policy, with Neural Interpolation')
@@ -162,8 +178,24 @@ def graphPolicy(polNet, policyEvalStates):
         stateDist = state[0]
         plt.axvline(stateDist)
     
+    # Indicate the training example choices (stored in actList)
+    trainChoice = []
+    trainDist = []
+    i = 0
+    relActs = []    
+    for state in policyEvalStates:  
+        if (state[1] == height):
+            trainChoice.append(actList[i])
+            relActs.append(actList[i])
+            trainDist.append(state[0])
+        i = i + 1
+    plt.plot(trainDist, trainChoice, 'o')
+    # print('All acts: \n', actList)
+    # print('Rel actlist: \n', relActs)
+    # import pdb; pdb.set_trace()
+
     plt.draw()
-    # plt.waitforbuttonpress(timeout=0.001)
+    
     
 def mainModelBased():
     # 1. Create a random value function
@@ -188,8 +220,9 @@ def mainModelBased():
     # Here we set the states used to update the policy
     start = 0
     stop = 10    
-    evalDist = np.linspace(start, stop, num=10)
-    evalHeight = np.linspace(start, stop, num=1) # Avoid segmenting on height until shown to be necessary
+    maxX = stop # For plotting
+    evalDist = np.linspace(start, stop, num=8)
+    evalHeight = [0, 0.5] # Avoid segmenting on height until shown to be necessary
     evalDir = [0]#[0,1] # 0 is pointing towards thermal center, 1 is pointing away from thermal center
     
     import itertools
@@ -217,7 +250,7 @@ def mainModelBased():
         
         # 4. Update policy based on current values 
         import updatePolicy
-        polNet = updatePolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize, thermRadius)
+        (polNet, nextStateList, nextValList, actList) = updatePolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize, thermRadius, numHiddenPol)
         
         # Print update value network on a few sample points
         print('Updated value function:')
@@ -245,12 +278,13 @@ def mainModelBased():
             plt.clf()
             
         # Plot value network
+        # valList is the values used by the policy network
         plt.subplot(2, 1, 1)        
-        graphValues(valNet, evalDir,policyEvalStates)
+        graphValues(valNet, evalDir,policyEvalStates, nextStateList, nextValList, maxX)
         
         # Plot policy network
         plt.subplot(2, 1, 2) 
-        graphPolicy(polNet,policyEvalStates)        
+        graphPolicy(polNet,policyEvalStates, actList, maxX)        
         
         # Allow for animation
         plt.waitforbuttonpress(timeout=0.001)

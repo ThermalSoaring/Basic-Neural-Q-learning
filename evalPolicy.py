@@ -95,7 +95,7 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
                 
                 # Calculate new value of states under the current policy, based on reward given
                 # Discount rate is how farsighted we are (between 0 and 1, with 1 being very far sighted, and 0 being not far sighted)
-                discRate = 0.8
+                discRate = 0.7
                 scale = 1 # Scaling of reward size
                 reward = getReward(nextState, scale)    
                 
