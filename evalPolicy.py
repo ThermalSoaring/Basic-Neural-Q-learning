@@ -4,7 +4,7 @@ from pybrain.datasets import SupervisedDataSet
 from pybrain.supervised.trainers.rprop import RPropMinusTrainer 
 
 # Updates distance from center of thermal
-def updateDist(oldDist, stepSize, numAct, chosenAction):
+def updateDist(oldDist, stepSize, numAct, chosenAction, oldDir):
     # If 11 actions, 10 are direction movement actions -> action 10 is orbit
     if (chosenAction == 2): # Orbiting (if just moving towards or away is allowed)
         newDist = oldDist 
@@ -16,8 +16,13 @@ def updateDist(oldDist, stepSize, numAct, chosenAction):
         deltaTempX = oldDist - stepSize*cos(theta)
         deltaTempY = sin(theta)*stepSize
         newDist = sqrt(pow(deltaTempX,2)+ pow(deltaTempY,2))
+    # Note that the plane is heading away from the thermal if it goes through the center
+    if (oldDir == 0 and oldDist < stepSize):
+        newDir = 1
+    else:
+        newDir = oldDir
     
-    return newDist
+    return (newDist,newDir)
 
 # Update height
 def updateHeight(oldHeight, distToThermal, thermRadius):     
@@ -36,34 +41,33 @@ def updateHeight(oldHeight, distToThermal, thermRadius):
 
 # Update height and direction based on direction change
 def updateDir(oldState, chosenAction): # chosenAction will be 0 (go towards thermal) or 1 (go away from thermal)
-    newState = oldState
+    newState = list(oldState)
     oldDir = oldState[2]
-    # switchPenal = 0.3 # Penalty for switching direction (in terms of height lost)
+    switchPenal = 0.3 # Penalty for switching direction (in terms of height lost)
     # Penalize change in direction
-    # if ((oldDir == 0 and chosenAction == 1) or (oldDir == 1 and chosenAction == 0)): # If a change of direction, reduce height
-        # newState[1] = oldState[1] - switchPenal
+    if ((oldDir == 0 and chosenAction == 1) or (oldDir == 1 and chosenAction == 0)): # If a change of direction, reduce height
+        newState[1] = oldState[1] - switchPenal
     # Update direction if not orbiting, otherwise keep direction the same
-    if (chosenAction != 2):    
+    if (chosenAction != 2):  
         newState[2] = chosenAction # Update direction
     return newState
     
 # Update distance, height and direction
 def updateState(oldState, stepSize, numAct, chosenAction, thermRadius):
-    oldDist = oldState[0]
-    newDist = updateDist(oldDist, stepSize, numAct, chosenAction)
+
+    # Update direction    
+    tempState = updateDir(oldState, chosenAction)
+    oldDist = tempState[0]
+    oldDir = tempState[2]
     
-    oldHeight = oldState[1]
-    
-    # Update height based on new position (seems conceptually good, but breaks things)
-    # newHeight = updateHeight(oldHeight, newDist, thermRadius)
-    
-    # Updates height based on old distance:
+    # Update height (based on old distance)
+    oldHeight = tempState[1]    
     newHeight = updateHeight(oldHeight, oldDist, thermRadius)
     
-    tempState = [newDist, newHeight, oldState[2]]
-    newState = tempState # No direction stuff
-    #newState = updateDir(tempState, chosenAction)
-    
+    # Update distance
+    (newDist, newDir) = updateDist(oldDist, stepSize, numAct, chosenAction, oldDir)    
+
+    newState = [newDist, newHeight, newDir]
     return newState  
     
 def getReward(state, scale):

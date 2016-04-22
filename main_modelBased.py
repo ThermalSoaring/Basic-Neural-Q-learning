@@ -107,6 +107,7 @@ def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, m
     valList = []     # Value if moving towards center
     
     # Determine value at multiple heights
+    # All for moving towards the center
     heightInd = 0
     for height in [0.5, 0.2, 0, -0.2, -0.5]:        
         valList.append([])
@@ -126,13 +127,13 @@ def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, m
     trainValToPlot = []
     trainDistToPlot = []
     i = 0
-    heightPlot = 0 # Plot only training examples at zero height
+    towardsCent = 0 # Plot only training examples going towards thermal
     
     # Plot data used for training policy network
-    for state in nextStateList:
-        #if (state[1] == heightPlot):
-        trainValToPlot.append(nextValList[i])
-        trainDistToPlot.append(state[0])
+    for state in nextStateList: 
+        if (state[2] == towardsCent):
+            trainValToPlot.append(nextValList[i])
+            trainDistToPlot.append(state[0])
         i = i + 1
     plt.plot(trainDistToPlot, trainValToPlot, 'o')
     #import pdb; pdb.set_trace()
@@ -155,6 +156,7 @@ def graphPolicy(polNet, policyEvalStates, actList, maxX):
     prefAway = []
     preOrb = []
     # Print how much we like the different actions
+    # This is all if we are facing the center of the thermal
     for pos in dist:
         height = 0
         towardsCent = 0
@@ -184,7 +186,7 @@ def graphPolicy(polNet, policyEvalStates, actList, maxX):
     i = 0
     relActs = []    
     for state in policyEvalStates:  
-        if (state[1] == height):
+        if (state[1] == height and state[2] == towardsCent):
             trainChoice.append(actList[i])
             relActs.append(actList[i])
             trainDist.append(state[0])
@@ -223,7 +225,7 @@ def mainModelBased():
     maxX = stop # For plotting
     evalDist = np.linspace(start, stop, num=8)
     evalHeight = [0, 0.5] # Avoid segmenting on height until shown to be necessary
-    evalDir = [0]#[0,1] # 0 is pointing towards thermal center, 1 is pointing away from thermal center
+    evalDir = [0,1] # 0 is pointing towards thermal center, 1 is pointing away from thermal center
     
     import itertools
     policyEvalStates = list(itertools.product(evalDist,evalHeight, evalDir)) # Takes cartesian product

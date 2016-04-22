@@ -69,7 +69,7 @@ def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,n
     # Relying on resetting netowrk for smoothing
     # print(supervised)   
     from pybrain.supervised.trainers.rprop import RPropMinusTrainer                
-    trainer = RPropMinusTrainer(polNet, dataset=supervised, verbose=True)  
+    trainer = RPropMinusTrainer(polNet, dataset=supervised, verbose=False)  
     numTrainIter = 50
     for i in range(numTrainIter):
         trainer.train()
