@@ -15,6 +15,10 @@
 
 import numpy as np
 
+# Tell Python where pybrain is
+import sys
+sys.path.insert(0, "/home/david.egolf/pybrain")
+
 # Input: state variables
 # Output: value of state
 def createValNetwork(dimState, numHidden):
@@ -116,7 +120,7 @@ def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, m
             valList[heightInd].append(val)            
         plt.plot(dist,valList[heightInd], label = height)
         heightInd = heightInd + 1
-    plt.legend()
+    #plt.legend()
     plt.xlim([0,maxX])
     plt.xlabel('Distance')
     plt.ylabel('Value')
@@ -271,8 +275,8 @@ def mainModelBased():
             plt.figure()  
             
             # Maximize the window
-            figManager = plt.get_current_fig_manager()
-            figManager.window.showMaximized() 
+            #figManager = plt.get_current_fig_manager()
+            #figManager.window.showMaximized() 
         # Periodically clear plot
         if (i % clearPeriod == 0 and i != 0):
             plt.clf()
