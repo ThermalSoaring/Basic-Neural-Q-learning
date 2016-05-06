@@ -17,10 +17,6 @@
 
 import numpy as np
 
-# Tell Python where pybrain is
-import sys
-sys.path.insert(0, "/home/david.egolf/pybrain")
-
 # Input: state variables
 # Output: value of state
 def createValNetwork(dimState, numHidden):
@@ -296,6 +292,11 @@ def mainModelBased():
         # Plot policy network
         plt.subplot(2, 1, 2)
         graphPolicy(polNet,policyEvalStates, actList, maxX)        
+        
+        # Save an image of the results (for SSH, when you can't just display)
+        if (i == 1):
+            # Store photos one directory up
+            plt.savefig('/home/david.egolf/debugImages/testPlot')
         
         # Allow for animation
         # plt.waitforbuttonpress(timeout=0.001)
