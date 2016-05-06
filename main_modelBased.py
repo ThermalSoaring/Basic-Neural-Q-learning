@@ -223,9 +223,9 @@ def mainModelBased():
     start = 0
     stop = 10    
     maxX = stop # For plotting
-    evalDist = np.linspace(start, stop, num=8)
-    evalHeight = [0, 0.5] # Avoid segmenting on height until shown to be necessary
-    evalDir = [0,1] # 0 is pointing towards thermal center, 1 is pointing away from thermal center
+    evalDist = np.linspace(start, stop, num=6)
+    evalHeight = [0]#[0, 0.5] # Avoid segmenting on height until shown to be necessary
+    evalDir = [0]#[0,1] # 0 is pointing towards thermal center, 1 is pointing away from thermal center
     
     import itertools
     policyEvalStates = list(itertools.product(evalDist,evalHeight, evalDir)) # Takes cartesian product
@@ -293,5 +293,5 @@ def mainModelBased():
         
         #import pdb; pdb.set_trace()
 
-#mainModelBased1D() # Only keeps track of distance to thermal
-mainModelBased()
+mainModelBased1D() # Only keeps track of distance to thermal
+#mainModelBased()
