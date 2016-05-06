@@ -1,3 +1,5 @@
+# LINUX VERSION
+
 # Overview:
 '''
  Develop a randomized policy (choose direction randomly)
@@ -147,8 +149,9 @@ def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, m
         plt.axvline(stateDist)
     
     #plt.legend()
-
-    plt.draw()   
+    
+    # Don't show the plot - save the plot (Linux)
+    # plt.draw()   
 
 def graphPolicy(polNet, policyEvalStates, actList, maxX):
     import matplotlib.pyplot as plt
@@ -197,8 +200,9 @@ def graphPolicy(polNet, policyEvalStates, actList, maxX):
     # print('All acts: \n', actList)
     # print('Rel actlist: \n', relActs)
     # import pdb; pdb.set_trace()
-
-    plt.draw()
+    
+    # Don't show the plot - save the plot (Linux)
+    #plt.draw()
     
     
 def mainModelBased():
