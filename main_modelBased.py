@@ -78,8 +78,8 @@ def mainModelBased1D():
     # Print initial policy
     print('Initial policy:')
     for state in policyEvalStates:
-        print(np.argmax(polNet.activate([state])))       
-    
+        print(np.argmax(polNet.activate([state])))
+
     # Make values consistent with policy
     import evalPolicy
     vMaxAll = 0.5 # We require values to stop changing by any more than this amount before we return the updated values
@@ -274,8 +274,11 @@ def mainModelBased():
                 
         # Display the estimated value function and policy
         clearPeriod = 1
-        if (i == 0): 
-            import matplotlib.pyplot as plt
+        if (i == 0):
+            import matplotlib as mpl
+            mpl.use('Agg')
+            
+            import matplotlib.pyplot as plt              
             plt.figure()  
             
             # Maximize the window
@@ -283,19 +286,19 @@ def mainModelBased():
             #figManager.window.showMaximized() 
         # Periodically clear plot
         if (i % clearPeriod == 0 and i != 0):
-            plt.clf()
-            
+            plt.clf() 
+                   
         # Plot value network
         # valList is the values used by the policy network
-        plt.subplot(2, 1, 1)        
+        plt.subplot(2, 1, 1)
         graphValues(valNet, evalDir,policyEvalStates, nextStateList, nextValList, maxX)
         
         # Plot policy network
-        plt.subplot(2, 1, 2) 
+        plt.subplot(2, 1, 2)
         graphPolicy(polNet,policyEvalStates, actList, maxX)        
         
         # Allow for animation
-        plt.waitforbuttonpress(timeout=0.001)
+        # plt.waitforbuttonpress(timeout=0.001)
         
         #import pdb; pdb.set_trace()
 
