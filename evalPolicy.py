@@ -151,6 +151,7 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
                 # input()
                 
                 # Return updated vallue function
+        # Show how much the value network is changing
         print('Max value change: ', vDiff)
         import sys ;sys.stdout.flush()
         

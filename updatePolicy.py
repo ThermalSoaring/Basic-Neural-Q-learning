@@ -39,9 +39,9 @@ def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,n
         for action in range(numAct):            
             nextState = ep.updateState(state, stepSize, numAct, action, thermRadius)
             
-            print('New state: ', nextState)
-            # print('Action: ', action)
-            # print('New state: ', nextState)            
+            # Print action and new state:
+            # print('New state: ', nextState)
+            # print('Action: ', action)           
             vNext = valNet.activate(nextState)
             valList.append(vNext)        
             
@@ -69,7 +69,7 @@ def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,n
     # Relying on resetting netowrk for smoothing
     # print(supervised)   
     from pybrain.supervised.trainers.rprop import RPropMinusTrainer                
-    trainer = RPropMinusTrainer(polNet, dataset=supervised, verbose=True)  
+    trainer = RPropMinusTrainer(polNet, dataset=supervised, verbose=False)  
     numTrainIter = 50
     for i in range(numTrainIter):
         trainer.train()
