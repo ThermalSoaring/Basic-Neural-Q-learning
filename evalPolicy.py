@@ -3,21 +3,45 @@ from math import pi, cos, pow, sin, sqrt, exp
 from pybrain.datasets import SupervisedDataSet 
 from pybrain.supervised.trainers.rprop import RPropMinusTrainer 
 
-# Updates distance from center of thermal
-def updateDist(oldDist, stepSize, numAct, chosenAction):
-    # If 11 actions, 10 are direction movement actions -> action 10 is orbit
-    if (chosenAction == 2): # Orbiting (if just moving towards or away is allowed)
-        newDist = oldDist 
-    else: 
-        # numAng = numAct # If no orbiting
-        numAng = numAct - 1 # Subtract orbit command
-        theta = chosenAction/(numAng-1)*pi;         
+# Change the direction of the UAV
+# 0 == facing center of thermal
+# 1 == facing away from center of thermal
+def swapDir(oldDir):
+    if (oldDir == 1):
+        return 0
+    elif (oldDir == 0):
+        return 1
+    else:
+        import sys
+        sys.exit("Invalid direction: should be 0 or 1.") 
 
-        deltaTempX = oldDist - stepSize*cos(theta)
-        deltaTempY = sin(theta)*stepSize
-        newDist = sqrt(pow(deltaTempX,2)+ pow(deltaTempY,2))
-    
-    return newDist
+# Updates distance from center of thermal (ideally done by simulator)
+# Also updates direction, if we pass through the thermal center
+def updateDist(oldDist, stepSize, chosenAction, oldDir):
+    # Travel in a straight line
+        # Direction given by oldDir
+        # Distance given by stepSize
+
+    # Actions 0 and 1 are going towards thermal and away. Action 2 is orbiting.
+    if (chosenAction == 2): # If orbiting, distance from center doesn't change
+        newDist = oldDist 
+    else:  
+        if (chosenAction == 0): # Go towards center
+            newDist = oldDist - stepSize
+        elif (chosenAction == 1): # Go away from center
+            newDist = oldDist + stepSize
+        else: # Throw an error
+            import sys
+            sys.exit("Invalid action provided: should be 0, 1, or 2.")   
+    # It's possible to get a negative distance if we overshot the center
+    # Note that we have change whether we are facing the thermal or no in this case
+    if (newDist < 0):
+        newDist = -newDist
+        newDir = swapDir(oldDir)
+    else:
+        newDir = oldDir
+            
+    return (newDist, newDir)
 
 # Update height
 def updateHeight(oldHeight, distToThermal, thermRadius):     
@@ -36,33 +60,33 @@ def updateHeight(oldHeight, distToThermal, thermRadius):
 
 # Update height and direction based on direction change
 def updateDir(oldState, chosenAction): # chosenAction will be 0 (go towards thermal) or 1 (go away from thermal)
-    newState = oldState
+    newState = list(oldState)
     oldDir = oldState[2]
-    # switchPenal = 0.3 # Penalty for switching direction (in terms of height lost)
+    switchPenal = 0.3 # Penalty for switching direction (in terms of height lost)
     # Penalize change in direction
-    # if ((oldDir == 0 and chosenAction == 1) or (oldDir == 1 and chosenAction == 0)): # If a change of direction, reduce height
-        # newState[1] = oldState[1] - switchPenal
+    # State order is this: [pos, height, towardsCent]
+    if (oldDir != chosenAction): # If a change of direction, reduce height
+        newState[1] = oldState[1] - switchPenal
     # Update direction if not orbiting, otherwise keep direction the same
     if (chosenAction != 2):    
         newState[2] = chosenAction # Update direction
     return newState
     
 # Update distance, height and direction
-def updateState(oldState, stepSize, numAct, chosenAction, thermRadius):
-    oldDist = oldState[0]
-    newDist = updateDist(oldDist, stepSize, numAct, chosenAction)
+def updateState(oldState, stepSize, chosenAction, thermRadius):    
+    # Update direction, and take the height penalty for changing direction
+    # State order is this: [pos, height, towardsCent]
+    tempState = updateDir(oldState, chosenAction)
+    tempDist = tempState[0]
+    tempHeight = tempState[1]  
+    tempDir = tempState[2]
     
-    oldHeight = oldState[1]
-    
-    # Update height based on new position (seems conceptually good, but breaks things)
-    # newHeight = updateHeight(oldHeight, newDist, thermRadius)
-    
-    # Updates height based on old distance:
-    newHeight = updateHeight(oldHeight, oldDist, thermRadius)
-    
-    tempState = [newDist, newHeight, oldState[2]]
-    newState = tempState # No direction stuff
-    #newState = updateDir(tempState, chosenAction)
+    # Update height  
+    newHeight = updateHeight(tempHeight, tempDist, thermRadius)
+
+    # Update distance
+    (newDist, newDir) = updateDist(tempDist, stepSize, chosenAction, tempDir)  
+    newState = [newDist, newHeight, newDir]
     
     return newState  
     
@@ -89,7 +113,7 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
                 
                 # Determine the next state (from contThermalEnvironment)
                 numAct = len(actionPref)                
-                nextState = updateState(state, stepSize, numAct, chosenAction, thermRadius)
+                nextState = updateState(state, stepSize, chosenAction, thermRadius)
                                 
                 # Calculate reward given for transition                
                 

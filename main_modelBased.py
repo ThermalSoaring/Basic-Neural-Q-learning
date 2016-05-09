@@ -10,17 +10,20 @@
  Each policy is guaranteed to be a strict improvement over the previous,
  except in the case in which the optimal policy has already been found.
 '''
+
+# NOTES: 
 # We assume that we know the transition function
 # -- Given state, action, we can determine the next state
 # -- Later we want to relax this assumption (use probabilities)
 # We assume that we know the reward function
 
-import numpy as np
+# State order is this: [pos, height, towardsCent]
 
+# Import:
+import numpy as np
 # For timestamp of file saved
 import time     
 import datetime
-
 # To allow folder creation
 import os
 
@@ -58,17 +61,18 @@ def createPolNetwork(dimState, numHidden, numAct):
 # evalDir = list of directions we can travel in
 def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, maxX):
     import matplotlib.pyplot as plt
-    start = 0; stop = 10;
-    dist = np.linspace(start, stop, num=60)
     
-    valList = []     # Value if moving towards center
+    # Create distance linspace for plotting
+    start = 0; stop = 10;
+    dist = np.linspace(start, stop, num=60)  
     
     # Determine value at multiple heights
-    heightInd = 0
-    for height in [0.5, 0.2, 0, -0.2, -0.5]:        
+    valList = [] # List of value estimates
+    heightInd = 0 # Which height we're working with
+    for height in [0.5, 0.2, 0, -0.2, -0.5]: # Desired heights     
         valList.append([])
         for pos in dist:              
-            towardsCent = 0
+            towardsCent = 0 # Desired direction to evaluate value network at
             val = valNet.activate([pos, height, towardsCent])[0] 
             valList[heightInd].append(val)            
         plt.plot(dist,valList[heightInd], label = height)
@@ -77,22 +81,23 @@ def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, m
     plt.xlim([0,maxX])
     plt.xlabel('Distance')
     plt.ylabel('Value')
-    plt.title('Approximated Value Function, with Neural Interpolation')
+    plt.title('Value Function, Direction = ' + str(towardsCent))
     
     # Plot data used to train policy network
     trainValToPlot = []
-    trainDistToPlot = []
-    i = 0
-    heightPlot = 0 # Plot only training examples at zero height
-    
+    trainDistToPlot = []    
+           
     # Plot data used for training policy network
+    # State order is this: [pos, height, towardsCent]
+    i = 0   # Which training example
     for state in nextStateList:
-        #if (state[1] == heightPlot):
-        trainValToPlot.append(nextValList[i])
-        trainDistToPlot.append(state[0])
+        towardsCent = 0 # Plot only training examples going towards thermal  
+        heightVal = 0   # Plot only examples at zero height
+        if (state[2] == towardsCent and state[1] == heightVal):
+            trainValToPlot.append(nextValList[i])
+            trainDistToPlot.append(state[0])
         i = i + 1
     plt.plot(trainDistToPlot, trainValToPlot, 'o')
-    #import pdb; pdb.set_trace()
     
     # Indicate where our training examples are
     for state in policyEvalStates:
@@ -113,10 +118,13 @@ def graphPolicy(polNet, policyEvalStates, actList, maxX):
     prefAway = []
     preOrb = []
     # Print how much we like the different actions
+    heightVal = 0       # What height to evaluate the policy at
+    towardsCentVal = 0  # What facing direction to evaluate the policy at
     for pos in dist:
-        height = 0
-        towardsCent = 0
+        height = heightVal   
+        towardsCent = towardsCentVal
         preferences = polNet.activate([pos, height, towardsCent])
+        # Record preference for different options
         prefToward.append(preferences[0])  
         prefAway.append(preferences[1])      
         preOrb.append(preferences[2])   
@@ -128,7 +136,7 @@ def graphPolicy(polNet, policyEvalStates, actList, maxX):
     plt.xlim([0,maxX])
     plt.ylim([-0.1,1.1])
     
-    plt.title('Policy, with Neural Interpolation')
+    plt.title('Policy at h=' + str(heightVal))
     plt.legend()
 
     # Indicate where our training examples are
@@ -142,19 +150,15 @@ def graphPolicy(polNet, policyEvalStates, actList, maxX):
     i = 0
     relActs = []    
     for state in policyEvalStates:  
-        if (state[1] == height):
+        # Store only training examples for desired height and direction
+        if (state[1] == heightVal and state[2] == towardsCentVal):
             trainChoice.append(actList[i])
             relActs.append(actList[i])
             trainDist.append(state[0])
         i = i + 1
     plt.plot(trainDist, trainChoice, 'o')
     # print('All acts: \n', actList)
-    # print('Rel actlist: \n', relActs)
-    # import pdb; pdb.set_trace()
-    
-    # Don't show the plot - save the plot (Linux)
-    #plt.draw()
-    
+    # print('Rel actlist: \n', relActs)    
     
 def mainModelBased():
     # Time stamp this run:

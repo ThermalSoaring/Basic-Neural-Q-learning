@@ -37,7 +37,7 @@ def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,n
         actBest = 0
         valList = []
         for action in range(numAct):            
-            nextState = ep.updateState(state, stepSize, numAct, action, thermRadius)
+            nextState = ep.updateState(state, stepSize, action, thermRadius)
             
             # Print action and new state:
             # print('New state: ', nextState)
