@@ -1,33 +1,22 @@
 # LINUX VERSION
 
-# Overview:
-'''
- Develop a randomized policy (choose direction randomly)
- -- Effectively acheived by setting random values
- Calculate consistent state values for this policy.
- Develop a new policy that is greedy with respect to these state values.
- Loop.
- Each policy is guaranteed to be a strict improvement over the previous,
- except in the case in which the optimal policy has already been found.
-'''
-
-# NOTES: 
-# We assume that we know the transition function
-# -- Given state, action, we can determine the next state
-# -- Later we want to relax this assumption (use probabilities)
-# We assume that we know the reward function
-
-# State order is this: [pos, height, towardsCent]
-
 # Import:
 import numpy as np
+
 # For timestamp of file saved
 import time     
 import datetime
+
 # To allow folder creation
 import os
 
-# Input: state variables
+# To take product of state variables
+import itertools
+
+# For making the policy self consistent
+import evalPolicy
+
+# Input: values of state variables
 # Output: value of state
 def createValNetwork(dimState, numHidden):
     # Build a feed forward neural network (with one hidden layer)
@@ -38,27 +27,32 @@ def createValNetwork(dimState, numHidden):
                        1, 	        # Number of output units
                        bias = True,
                        hiddenclass = SigmoidLayer,
-                       outclass = LinearLayer # Allows for a large output
+                       outclass = LinearLayer # Allows for a large output (not just between 0 and 1)
                        )	
     return valNet
 
-# Input: state variables
-# Output: classification of actions (one hot encoded)
+''' Returns a policy network
+Input: state variables
+Output: classification of actions (one hot encoded)
+'''
 def createPolNetwork(dimState, numHidden, numAct):
-     # Build a feed forward neural network (with a single hidden layer)
+    # Build a feed forward neural network (with one hidden layer)
     from pybrain.structure import SigmoidLayer, SoftmaxLayer
     from pybrain.tools.shortcuts import buildNetwork
     polNet = buildNetwork(dimState, # Number of input units
                        numHidden, 	# Number of hidden units
-                       numAct, 	        # Number of output units
+                       numAct, 	    # Number of output units
                        bias = True,
                        hiddenclass = SigmoidLayer,
-                       outclass=SoftmaxLayer # Outputs are in (0,1), and add to 1
+                       outclass=SoftmaxLayer # Outputs are in the interval (0,1), and they sum to 1
                        )	
     return polNet
 
-# Plot estimated value function 
-# evalDir = list of directions we can travel in
+''' Plot estimated value function 
+valNet = value network (inputs = state values, output = value of state)
+evalDir = list of directions we can travel in
+policyEvalStates = discretized states
+'''
 def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, maxX):
     import matplotlib.pyplot as plt
     
@@ -103,12 +97,14 @@ def graphValues(valNet, evalDir, policyEvalStates, nextStateList, nextValList, m
     for state in policyEvalStates:
         stateDist = state[0]
         plt.axvline(stateDist)
+        
+    # Graph saved to file elsewhere periodically
     
-    #plt.legend()
-    
-    # Don't show the plot - save the plot (Linux)
-    # plt.draw()   
-
+  
+''' Plots current policy 
+    -Plots preference for each action
+    -Plots training examples for policy
+'''
 def graphPolicy(polNet, policyEvalStates, actList, maxX):
     import matplotlib.pyplot as plt
     start = 0; stop = 10;
@@ -160,53 +156,101 @@ def graphPolicy(polNet, policyEvalStates, actList, maxX):
     # print('All acts: \n', actList)
     # print('Rel actlist: \n', relActs)    
     
-def mainModelBased():
-    # Time stamp this run:
+''' Creates a list of states
+    This are the states at which:
+    -The value function makes sures it is self consistent
+    -The policy makes sure it is greedy
+    Use neural network interpolation to make estimates elsewhere
+''' 
+def createEvalStates(): 
+    # Distance discretization
+    start = 0; stop = 10;    
+    evalDist = np.linspace(start, stop, num=8)
+    
+    # Height discretization
+    evalHeight = [0, 0.5] # 
+    
+    # Direction discretization 
+    # 0 = towards thermal center, 1 = away from thermal center
+    evalDir = [0]  
+    
+    # Takes cartesian product to create complete discretized states
+    policyEvalStates = list(itertools.product(evalDist,evalHeight, evalDir)) 
+    
+    return policyEvalStates
+
+''' Returns a time stamp in the form m-d H-M-S
+'''
+def createTimeStamp():
     ts = time.time()
     st = datetime.datetime.fromtimestamp(ts).strftime('%m-%d %H-%M-%S')
+    return st
 
-    # 1. Create a random value function
-    dimState = 3 # Number of state variables used in discretized training examples (position from thermal, height, direction (towards or away center))
-    numHiddenVal = 20 # Number of hidden neurons
-    valNet = createValNetwork(dimState,numHiddenVal)  # Using two hidden layers for precision  
+''' Returns a randomly initialized value function
+'''
+def initValNetwork():
+    # Number of state variables used in discretized training examples (position from thermal, height, direction (towards or away center))
+    dimState = 3 
     
-    # 2. Create a random policy network
-    numHiddenPol = 20 # Number of hidden neurons
-    numAng = 2 # Towards or away from thermal center   
-    # numAct = numAng # If no orbiting
+    numHiddenVal = 20 # Number of neurons in hidden layer of value network
+    valNet = createValNetwork(dimState, numHiddenVal)
+    return valNet
+
+''' Returns a randomly initialized policy network    
+'''
+def initPolNetwork(valNet):
+    numHiddenPol = 20 # Number of neurons in hidden layer of policy network
+    
+    # Number of angles UAV can travel in  
+    # numAng = 2 indicates UAV can travel away or towards thermal center
+    numAng = 2        
+
+    # Number of state variables
+    dimState = valNet.indim
+    
     numAct = numAng + 1 # Number of actions (additional action is for orbit - preserve distance from center)
-    polNet = createPolNetwork(dimState, numHiddenPol, numAct)       
+    polNet = createPolNetwork(dimState, numHiddenPol, numAct) 
     
+    return polNet
+ 
+''' Prints current policy to console
+'''
+def printPolicy(polNet, policyEvalStates):
+    print('Policy:')
+    print('Choices \t Discretizing States')
+    for state in policyEvalStates:
+        print(np.argmax(polNet.activate(state)), end = '\t\t')        
+        for stateVar in state:
+            print('%.2f' % stateVar, end = "\t")            
+        print()
+
+    import sys; sys.stdout.flush()
+  
+''' Main program loop
+Strategy:
+-Develop a randomized policy (choose actions randomly)
+-Calculate consistent state values for this policy.
+-Develop a new policy that is greedy with respect to these state values.
+-Loop. 
+'''  
+def mainModelBased():
+    # Time stamp this run:
+    st = createTimeStamp()
+
+    # Create a value function (randomly initialized values)
+    valNet = initValNetwork()
     
-    # 3. Update values based on current policy
-    # The policy is greedy with respect to the value estimates
+    # Create a policy network (randomly initialized policy choices)
+    polNet = initPolNetwork(valNet)       
     
-    # 3a. Determine subset of state to update on
-    # It isn't practical to visit every possible state
-    # Instead, we will work on a discretized version of the state space, and trust to the neural network for interpolation    
-    # Here we set the states used to update the policy
-    start = 0
-    stop = 10    
-    maxX = stop # For plotting
-    evalDist = np.linspace(start, stop, num=8)
-    evalHeight = [0, 0.5] # Avoid segmenting on height until shown to be necessary
-    evalDir = [0]#[0,1] # 0 is pointing towards thermal center, 1 is pointing away from thermal center
-    
-    import itertools
-    policyEvalStates = list(itertools.product(evalDist,evalHeight, evalDir)) # Takes cartesian product
+    # Choose discretizing states
+    # Where value network checks for consistency, and policy network is greedy
+    policyEvalStates = createEvalStates()   
     
     # Print initial policy
-    printPolVal = 0
-    if (printPolVal == 1):
-        print('Initial policy:')
-        print('Choice \t State')
-        for state in policyEvalStates:
-            print(np.argmax(polNet.activate(state)), '\t', state)   
+    printPolicy(polNet, policyEvalStates)
     
-    import sys; sys.stdout.flush()
-        
     # Go back and forth between value and policy
-    import evalPolicy
     vMaxAll = 0.5   # We require values to stop changing by any more than this amount before we return the updated values
     stepSize = 0.1  # How far the airplane moves each time (needed to predict next state, make policy decisions)
     thermRadius = 3 # Standard deviation of normal shaped thermal   
@@ -221,20 +265,27 @@ def mainModelBased():
         
         # 4. Update policy based on current values 
         import updatePolicy
+        
+        # TEMP
+        numAct = 3  # Towards, away, orbit
+        numHiddenPol = 20 
+        evalDir = [0] 
+        maxX = 10 # Upper limit for plotting
+        # END TEMP
+        
         (polNet, nextStateList, nextValList, actList) = updatePolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize, thermRadius, numHiddenPol)
         
-        if (printPolVal == 1):
+        # TEMP
+        # if (printPolVal == 1):
             # Print update value network on a few sample points
-            print('Updated value function:')
-            print('Value \t State')
-            for state in policyEvalStates:
-                print(valNet.activate(state), '\t', state) 
+            # print('Updated value function:')
+            # print('Value \t State')
+            # for state in policyEvalStates:
+                # print(valNet.activate(state), '\t', state) 
+        # END TEMP
             
-            # Print updated policy on a few sample points
-            print('Updated policy:')
-            print('Choice \t State')
-            for state in policyEvalStates:
-                print(np.argmax(polNet.activate(state)), '\t', state)   
+        # Print updated policy
+        printPolicy(polNet, policyEvalStates) 
                 
         # Display the estimated value function and policy
         clearPeriod = 1
@@ -267,6 +318,3 @@ def mainModelBased():
             plt.savefig(saveDir + 'iter = ' + str(i))        
 
 mainModelBased()
-
-
-
