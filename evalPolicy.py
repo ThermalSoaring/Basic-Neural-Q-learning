@@ -3,41 +3,53 @@ from math import pi, cos, pow, sin, sqrt, exp
 from pybrain.datasets import SupervisedDataSet 
 from pybrain.supervised.trainers.rprop import RPropMinusTrainer 
 
-# Change the direction of the UAV
-# 0 == facing center of thermal
-# 1 == facing away from center of thermal
+# Import to:
+# -allow exiting with an error message
+# -force printing
+import sys 
+
+''' Change the direction of the UAV
+0 == facing center of thermal
+1 == facing away from center of thermal
+
+oldDir = the direction the UAV was facing prior to the function call
+'''
 def swapDir(oldDir):
     if (oldDir == 1):
         return 0
     elif (oldDir == 0):
         return 1
-    else:
-        import sys
+    else:        
         sys.exit("Invalid direction: should be 0 or 1.") 
 
-# Updates distance from center of thermal (ideally done by simulator)
-# Also updates direction, if we pass through the thermal center
-def updateDist(oldDist, stepSize, chosenAction, oldDir):
-    # Travel in a straight line
-        # Direction given by oldDir
-        # Distance given by stepSize
+''' Update distance and direction of UAV from center of thermal, based on the movement action chosen
+This update occurs last (after height and direction are updated)
 
-    # Actions 0 and 1 are going towards thermal and away. Action 2 is orbiting.
-    if (chosenAction == 2): # If orbiting, distance from center doesn't change
+oldDist =       the distance of the UAV from the center of the thermal prior to the function call
+oldDir =        the direction the UAV was facing prior to the function call
+stepSize =      distance UAV moves upon making a non-orbiting action
+action =        the action chosen, the effect of which on state variables is being carried out
+                action = 0 -> UAV moves towards thermal center
+                action = 1 -> UAV moves away from thermal center
+                action = 2 -> UAV orbits (position from center of thermal remains unchanged)
+'''   
+def updateDist(oldDist, stepSize, action, oldDir):
+    # If orbiting, distance from center doesn't change
+    if (action == 2): 
         newDist = oldDist 
     else:  
-        if (chosenAction == 0): # Go towards center
+        # UAV moves towards center of thermal
+        if (action == 0):
             newDist = oldDist - stepSize
-        elif (chosenAction == 1): # Go away from center
+        # UAV moves away from center of thermal
+        elif (action == 1): 
             newDist = oldDist + stepSize
-        else: # Throw an error
-            import sys
+        else: #  Invalid action    
             sys.exit("Invalid action provided: should be 0, 1, or 2.")   
-    # It's possible to get a negative distance if we overshot the center
-    # Note that we have change whether we are facing the thermal or no in this case
+    # If ther UAV passes through the center of the thermal, newDist will be negative
     if (newDist < 0):
-        newDist = -newDist
-        newDir = swapDir(oldDir)
+        newDist = -newDist          # Work only with positive distances
+        newDir = swapDir(oldDir)    # The direction of the UAV relative to the thermal center has changed
     else:
         newDir = oldDir
             
@@ -90,96 +102,109 @@ def updateState(oldState, stepSize, chosenAction, thermRadius):
     
     return newState  
     
-def getReward(state, scale):
+def getReward(state):
     # Give a reward corresponding to our height    
     currHeight = state[1]
-    return scale*currHeight
-       
-# Make values consistent with policy
-def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, stepSize, thermRadius):
+    return currHeight
+ 
+# Returns the action chosen by the policy net polNet in the state currState
+def getPolAction(polNet, currState):
+    actionPref = polNet.activate(currState) # List of preferences for each action, each in [0,1]               
+    chosenAction = np.argmax(actionPref)    # The policy chooses the action with the highest value 
+    return chosenAction
+    
+''' Make values consistent with policy
+Create new value estimate at each of policyEvalStates.
+-The new value estimate is
+    :the reward obtained under the current policy 
+    +
+    the estimated value of the state landed in (discounted because in the future)
+-Note that all value estimates are updated at the same time
+
+See https://webdocs.cs.ualberta.ca/~sutton/book/ebook/node41.html for details.
+
+valNet =            value network (inputs = state variable values, output = value of state)
+polNet =            policy network (inputs = state variable values, output = preferences for different actions)
+policyEvalStates =  discretized states used for training networks
+vMaxAll =           upper bound on maximum change in value estimates across all policyEvalStates before value function is considered self consistent
+stepSize =          distance UAV moves upon making a non-orbiting action
+thermRadius =       standard deviation of Gaussian shaped therma
+discRate =          how farsighted we are (0 = future gain is worthless, 1 = future gain is just as important as present gain)  
+numMaxEpochs =      IF USING VALIDATION DATA: maximum number of epochs to train the value network 
+             =      IF NOT USING VALIDATION DATA: number of times to train the value network
+'''
+def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, discRate, numMaxEpochs, stepSize, thermRadius):
+    
+    # Ensure we update the value estimates at least once
     vDiffStart = 10000
-    vDiff = vDiffStart    
+    vDiff = vDiffStart   
+    
+    # Make sure vMaxAll is positive and less than the large vDiffStart
+    if (vMaxAll <= 0 or vMaxAll >= vDiffStart):
+        sys.exit("vMaxAll is too large or too small.") 
+    
     while(vDiff > vMaxAll):
-        vDiff = vDiffStart
+        vDiff = 10000   # Ensure the value estimates update at least once
         
-        for state in policyEvalStates: # Go through the states in the discretization 
+        # Create set of data to hold new value estimates, for each of the discretized state estimates
+        # Inputs = values of state variables (distance, height, direction)
+        # Output = value of state described by value of state variables on inputs (a real number)
+        supervised = SupervisedDataSet(valNet.indim, 1) # numInput, numOutputs   
         
-                # Stores next state according to the current policy
-                nextState = [];
+        # For each state in the special list of discretized states, get a new value estimate
+        for state in policyEvalStates:        
+            # Stores next state according to the current policy
+            nextState = []
 
-                # Determine what the chosen action is, from the policy network
-                actionPref = polNet.activate(state)               
-                chosenAction = np.argmax(actionPref) # Choose the one with highest output   
-                
-                # Determine the next state (from contThermalEnvironment)
-                numAct = len(actionPref)                
-                nextState = updateState(state, stepSize, chosenAction, thermRadius)
-                                
-                # Calculate reward given for transition                
-                
-                # Calculate new value of states under the current policy, based on reward given
-                # Discount rate is how farsighted we are (between 0 and 1, with 1 being very far sighted, and 0 being not far sighted)
-                discRate = 0.7
-                scale = 1 # Scaling of reward size
-                reward = getReward(nextState, scale)    
-                
-                # Calculate new estimate for value 
-                VstateNew = reward + discRate*valNet.activate(nextState);       
-                
-                # Determine how much the value changed
-                # Keep track of maximum change seen so far
-                VstateOld = valNet.activate(state)
-                vChange = abs(VstateOld - VstateNew)
-                if (vDiff == vDiffStart):
-                    vDiff = vChange
-                elif (vChange > vDiff):
-                    vDiff = vChange
-                
-                # Update value network with new estimate, keeping everything else the same   
-
-                # First, get training examples                               
-                supervised = SupervisedDataSet(valNet.indim, 1) # numInput, numOutputs   
-                supervised.addSample(state, VstateNew)
-                for loc in policyEvalStates: # Go through all discretized states 
-                    if (loc != state):
-                        inp = loc
-                        tgt = valNet.activate(loc)
-                        supervised.addSample(inp,tgt)
+            # Determine the action chosen by the policy net in this state
+            # state -> (chosen action) 
+            chosenAction = getPolAction(polNet, state)
+            
+            # Determine the next state, as well as its estimated value
+            # state -> (chosen action) -> nextState
+            nextState = updateState(state, stepSize, chosenAction, thermRadius)
+            vNextState = valNet.activate(nextState)
+                            
+            # Calculate reward given for transition that occurs under current policy choice    
+            # state -> (chosen action) -> nextState...results in reward           
+            reward = getReward(nextState) 
+            
+            # Calculate new value of state under the current policy, based on reward given and value of state landed in                
+            # discRate = How farsighted we are (0 = future gain is worthless, 1 = future gain is just as important as present gain)     
+            vStateNew = reward + discRate*vNextState;       
+            
+            # To determine if convergence is occuring, determine how much value estimate changed
+            # Keep track of maximum change seen so far (needs to be less than vMaxAll to allow us to move on)
+            vStateOld = valNet.activate(state)
+            vChange = abs(vStateOld - vStateNew)
+            if (vDiff == vDiffStart): # Update vDiff to the maximum seen in this learning cycle (this while-loop iteration)
+                vDiff = vChange
+            elif (vChange > vDiff):
+                vDiff = vChange
+            
+            # Store the new value estimate (used to train neural network once we have a new value estimate for all states)   
+            # This means: "In this state, called 'state', we estimate a value of vStateNew."
+            supervised.addSample(state, vStateNew) 
                         
-                # Next, train on these training examples                               
-                trainer = RPropMinusTrainer(valNet, dataset=supervised, verbose=False)               
+        # Store these value estimates by updating the value network                           
+        trainer = RPropMinusTrainer(valNet, dataset=supervised, verbose=False)               
                 
-                # Train manually, to avoid using validation data
-                # trainer.trainUntilConvergence(maxEpochs=50)   # Requires validation data 
-                # I don't mind overfitting this - just so long as generalization is OK (so far, seems OK)
-                # Sometimes we do get weird curves where there should not be
-                numTrainIter = 30
-                for i in range(numTrainIter):
-                    trainer.train()                
-
-                # Print training status
-                # print('Old state:', state)
-                # print('Preferences:', actionPref)
-                # print('Choice:', chosenAction)
-                # print('New state:', nextState)
-                # print('Reward:', reward)
-                # print('New Value:', VstateNew)
-                # print('Value change:', vChange)
-                # print('Max change:', vDiff)
-                # print('Supervised data set:', supervised)
-                
-                # print('Actual network outputs:')
-                # for loc in policyEvalStates:
-                    # print(valNet.activate(loc))
-                
-                # input()
-                
-                # Return updated vallue function
-        # Show how much the value network is changing
-        print('Max value change: ', vDiff)
-        import sys ;sys.stdout.flush()
+        # Two ways to update the neural network: (CHOOSE ONLY ONE)  
+        # =========================================================================== 
+        # 1. With validation data
+        # --The network is trained on a subset of training examples, and then checked to see how well it generalizes to the unused examples
+        # --Danger of underfitting (not matching all the training examples)
+        trainer.trainUntilConvergence(maxEpochs=numMaxEpochs) 
         
-    return valNet    
-    
-    
-    
+        # # 2. Without validation data
+        # # --The network is trained on all the training examples.
+        # # --Danger of overfitting (sacrificing interpolation)
+        # for i in range(numMaxEpochs):
+            # trainer.train()                
+                
+        # Show how much the value estimates are changing, to illustrate convergence (or lack thereof)
+        print('Max value change: ', vDiff)
+        sys.stdout.flush()
+        
+    # Return updated value function  
+    return valNet        

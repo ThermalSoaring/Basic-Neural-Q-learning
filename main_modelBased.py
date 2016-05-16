@@ -296,10 +296,16 @@ def mainModelBased():
     # =========================================================================== 
 
     # Specify learning parameters
-    # =========================================================================== 
-    # Go back and forth between value and policy
+    # ===========================================================================
+    # For making value function consistent:
     vMaxAll = 0.5   # Upper bound on maximum change in value estimates across all policyEvalStates before value function is considered self consistent
+    discRate = 0.7  # How farsighted we are (0 = future gain is worthless, 1 = future gain is just as important as present gain)  
+    numMaxEpochsVal = 30 # IF USING VALIDATION DATA: maximum number of epochs to train the value network 
+                         # IF NOT USING VALIDATION DATA: number of times to train the value network
+    
+    # For the overall learning process"
     numLearn = 100  # Number of times to repeat the following process: make value estimates consistent, make policy greedy with respect to new values
+    
     # ===========================================================================             
     
     # Learning loop
@@ -308,8 +314,8 @@ def mainModelBased():
         # Display current learning iteration
         print('Start iteration: ', str(i))
         
-        # Make value estimates consistent with current policy
-        valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll, stepSize, thermRadius)  
+        # Make value estimates consistent with current policy        
+        valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll,discRate, numMaxEpochsVal, stepSize, thermRadius)  
         
         # Make policy greedy with respect to current value estimates
         # TEMP
@@ -325,11 +331,7 @@ def mainModelBased():
                 
         # Plot the current value function and policy
         # =========================================================================== 
-        if (i == 0):
-            # import matplotlib as mpl
-            # mpl.use('Agg') # Allows plots to be saved instead of being displayed
-            
-            # import matplotlib.pyplot as plt              
+        if (i == 0):       
             plt.figure()      
         
         # Only create and save a plot every few iteration
