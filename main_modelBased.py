@@ -269,9 +269,9 @@ def mainModelBased():
     # ===========================================================================    
     if (dimState >= 2):    
         # Distance discretization
-        evalDist = np.linspace(0, 10, num=4)
+        evalDist = np.linspace(0, 10, num=10)
         # Height discretization
-        evalHeight = [0]#[0, 0.5] # 
+        evalHeight = [0, 0.5]#[0, 0.5] # 
     if (dimState >= 3):
         # Direction discretization 
         # 0 = towards thermal center, 1 = away from thermal center
@@ -293,6 +293,8 @@ def mainModelBased():
     # =========================================================================== 
     stepSize = 0.1  # Distance UAV moves upon making a non-orbiting action
     thermRadius = 3 # Standard deviation of Gaussian shaped thermal 
+    thermCenter = 0 # Center of Gaussian shaped thermal
+    switchPenal = 0.2 # the height lost for chosing to switch directions (without passing through center of thermal)
     # =========================================================================== 
 
     # Specify learning parameters
@@ -315,13 +317,13 @@ def mainModelBased():
         print('Start iteration: ', str(i))
         
         # Make value estimates consistent with current policy        
-        valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll,discRate, numMaxEpochsVal, stepSize, thermRadius)  
+        valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll,discRate, numMaxEpochsVal, stepSize, thermRadius, thermCenter,switchPenal)  
         
         # Make policy greedy with respect to current value estimates
         # TEMP
         numHiddenPol = 20 # Required because policy network is being recreated everytime - this should not be necessary!
         # END TEMP
-        (polNet, nextStateList, nextValList, actList) = updatePolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize, thermRadius, numHiddenPol)
+        (polNet, nextStateList, nextValList, actList) = updatePolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize, thermRadius, thermCenter, numHiddenPol, switchPenal)
         
         # Print updated value function
         printVal(valNet, policyEvalStates)

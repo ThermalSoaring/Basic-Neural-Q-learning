@@ -19,7 +19,7 @@ def createPolNetwork(dimState, numHidden, numAct):
 
 
 # Make policy greedy with respect to current value net 
-def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,numHidden):
+def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,thermCenter,numHidden, switchPenal):
 
     from pybrain.datasets import SupervisedDataSet  
     from pybrain.utilities import one_to_n
@@ -37,7 +37,7 @@ def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,n
         actBest = 0
         valList = []
         for action in range(numAct):            
-            nextState = ep.updateState(state, stepSize, action, thermRadius)
+            nextState = ep.updateState(state, stepSize, action, thermRadius, thermCenter, switchPenal)
             
             # Print action and new state:
             # print('New state: ', nextState)

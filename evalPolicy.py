@@ -1,5 +1,8 @@
 import numpy as np
 from math import pi, cos, pow, sin, sqrt, exp
+
+# Allow for "resilient backpropogation" training on neural networks
+# See here for details: https://en.wikipedia.org/wiki/Rprop
 from pybrain.datasets import SupervisedDataSet 
 from pybrain.supervised.trainers.rprop import RPropMinusTrainer 
 
@@ -21,9 +24,8 @@ def swapDir(oldDir):
         return 1
     else:        
         sys.exit("Invalid direction: should be 0 or 1.") 
-
+       
 ''' Update distance and direction of UAV from center of thermal, based on the movement action chosen
-This update occurs last (after height and direction are updated)
 
 oldDist =       the distance of the UAV from the center of the thermal prior to the function call
 oldDir =        the direction the UAV was facing prior to the function call
@@ -55,56 +57,99 @@ def updateDist(oldDist, stepSize, action, oldDir):
             
     return (newDist, newDir)
 
-# Update height
-def updateHeight(oldHeight, distToThermal, thermRadius):     
-    # Gaussian shaped thermal
-    # sigma = thermRadius
-    # thermBoost = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal,2)/(2*pow(sigma,2))) 
-    
-    # Ring shaped thermal
-    drop = 0.05 # Realize the plane will tend to fall
-    
-    shift = 5; # Where to put the center of boost, relative to center of thermal
-    sigma = thermRadius
-    thermBoost = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal-shift,2)/(2*pow(sigma,2)))   
+''' Update height
+Boosts the height of the UAV based on current thermal strength
 
-    return (oldHeight + thermBoost - drop)
+oldHeight =     height of UAV before boost
+distToThermal = distance from UAV to center of thermal
+thermRadius =   radius of ring shaped Gaussian shaped thermal
+thermCenter =   distance of peak of ring shaped Gaussian shaped thermal from thermal center
 
-# Update height and direction based on direction change
-def updateDir(oldState, chosenAction): # chosenAction will be 0 (go towards thermal) or 1 (go away from thermal)
-    newState = list(oldState)
+See here for details on this sort of distribution: https://en.wikipedia.org/wiki/Normal_distribution
+'''
+def updateHeight(oldHeight, distToThermal, thermRadius, shift):       
+
+    thermBoost = 1/(thermRadius*sqrt(2*pi)) * exp(-pow(distToThermal-shift,2)/(2*pow(thermRadius,2)))   
+
+    return (oldHeight + thermBoost)   
+ 
+''' Give direction choice, update height and direction 
+The height is updated to reflect a loss in height for turning around
+
+oldState =      [oldDist, oldHeight, oldDirection] is the state of the UAV before the update is applied
+chosenAction =  action chosen by UAV (go towards thermal center = 0, go away from thermal center = 1, or orbit = 2)
+switchPenal =   the height lost for chosing to switch directions (without passing through center of thermal)
+''' 
+def updateDir(oldState, chosenAction, switchPenal):
+    # Check we have the right number of state variables
+    if (len(oldState) != 3):
+        sys.exit("Wrong number of state variables to change direction - need 3 states.")    
+
+    # Unpack state
+    newState = list(oldState) # Create a deep copy of the old state
+    oldDist = oldState[0]
+    oldHeight = oldState[1]
     oldDir = oldState[2]
-    switchPenal = 0.3 # Penalty for switching direction (in terms of height lost)
-    # Penalize change in direction
-    # State order is this: [pos, height, towardsCent]
-    if (oldDir != chosenAction): # If a change of direction, reduce height
-        newState[1] = oldState[1] - switchPenal
-    # Update direction if not orbiting, otherwise keep direction the same
-    if (chosenAction != 2):    
-        newState[2] = chosenAction # Update direction
+    
+    # Determine new desired direction
+    if (chosenAction == 0):     # Go towards center
+        newDir = 0
+    elif (chosenAction == 1):   # Go away from center
+        newDir = 1
+    elif (chosenAction == 2):   # Orbit - which does not incur a turning penalty
+        newDir = oldDir
+    else:
+        sys.exit("Invalid action chosen. Should be 0, 1, or 2.")
+    
+    # Apply switching penalty if applicable
+    if (oldDir != newDir):
+        newHeight = oldHeight - switchPenal
+    else:
+        newHeight = oldHeight
+        
+    # Return the new state of the UAV    
+    newState = [oldDist, newHeight, newDir]
     return newState
     
-# Update distance, height and direction
-def updateState(oldState, stepSize, chosenAction, thermRadius):    
-    # Update direction, and take the height penalty for changing direction
-    # State order is this: [pos, height, towardsCent]
-    tempState = updateDir(oldState, chosenAction)
-    tempDist = tempState[0]
-    tempHeight = tempState[1]  
-    tempDir = tempState[2]
-    
-    # Update height  
-    newHeight = updateHeight(tempHeight, tempDist, thermRadius)
+''' Update direction, distance and height (in that order)
+Heights are updated based on the position of the UAV afer moving (choose action -> move -> get reward based on results)
 
-    # Update distance
-    (newDist, newDir) = updateDist(tempDist, stepSize, chosenAction, tempDir)  
-    newState = [newDist, newHeight, newDir]
+oldState =      [oldDist, oldHeight, oldDirection] is the state of the UAV before the update is applied
+stepSize =      distance UAV moves upon making a non-orbiting action
+chosenAction =  action chosen by UAV (go towards thermal center = 0, go away from thermal center = 1, or orbit = 2)
+thermRadius =   radius of ring shaped Gaussian shaped thermal
+thermCenter =   distance of peak of ring shaped Gaussian shaped thermal from thermal center
+switchPenal =   the height lost for chosing to switch directions (without passing through center of thermal)
+'''
+def updateState(oldState, stepSize, chosenAction, thermRadius, thermCenter, switchPenal):    
+    # Check we have the right number of state variables
+    if (len(oldState) != 3):
+        sys.exit("Number of state variable should be 3 to update state.")
+
+    # Give direction choice, update direction and height 
+    # There is a height penalty for choosing to switch direction
+    newState = updateDir(oldState, chosenAction, switchPenal)       
+    newDist = newState[0]
+    newHeight = newState[1]
+    newDir = newState[2]
     
+    # Update distance from center of thermal, and direction of UAV (if UAV flies through center of thermal) 
+    (newDist, newDir) = updateDist(newDist, stepSize, chosenAction, newDir)  
+    
+    # Update height of UAV
+    # Note: The boost applied is based on the position of the UAV AFTER the action is applied
+    newHeight = updateHeight(newHeight, newDist, thermRadius, thermCenter)
+    
+    # Return the new state of the UAV
+    newState = [newDist, newHeight, newDir]    
     return newState  
-    
-def getReward(state):
-    # Give a reward corresponding to our height    
-    currHeight = state[1]
+
+''' Returns the reward for being in state currState
+currState = the current state of the UAV  ([distance,height, direction])
+'''
+def getReward(currState):     
+    # The height is rewarded
+    currHeight = currState[1]
     return currHeight
  
 # Returns the action chosen by the policy net polNet in the state currState
@@ -133,7 +178,7 @@ discRate =          how farsighted we are (0 = future gain is worthless, 1 = fut
 numMaxEpochs =      IF USING VALIDATION DATA: maximum number of epochs to train the value network 
              =      IF NOT USING VALIDATION DATA: number of times to train the value network
 '''
-def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, discRate, numMaxEpochs, stepSize, thermRadius):
+def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, discRate, numMaxEpochs, stepSize, thermRadius, thermCenter, switchPenal):
     
     # Ensure we update the value estimates at least once
     vDiffStart = 10000
@@ -162,7 +207,7 @@ def evalPolicy(valNet,polNet,policyEvalStates, vMaxAll, discRate, numMaxEpochs, 
             
             # Determine the next state, as well as its estimated value
             # state -> (chosen action) -> nextState
-            nextState = updateState(state, stepSize, chosenAction, thermRadius)
+            nextState = updateState(state, stepSize, chosenAction, thermRadius, thermCenter, switchPenal)
             vNextState = valNet.activate(nextState)
                             
             # Calculate reward given for transition that occurs under current policy choice    
