@@ -1,77 +1,119 @@
-import evalPolicy as ep
 import numpy as np
+
+# For making the value estimates self consistent
+import evalPolicy as ep
+
+# For breaking ties randomly between actions with the same value
 import random
 
-# Input: state variables
-# Output: classification of actions (one hot encoded)
-def createPolNetwork(dimState, numHidden, numAct):
-     # Build a feed forward neural network (with a single hidden layer)
-    from pybrain.structure import SigmoidLayer, SoftmaxLayer
-    from pybrain.tools.shortcuts import buildNetwork
-    polNet = buildNetwork(dimState, # Number of input units
-                       numHidden, 	# Number of hidden units
-                       numAct, 	        # Number of output units
-                       bias = True,
-                       hiddenclass = SigmoidLayer,
-                       outclass=SoftmaxLayer # Outputs are in (0,1), and add to 1
-                       )	
-    return polNet
+# For the creation of a policy network
+import makePolNetwork as mp
+
+# Allow for "resilient backpropogation" training on neural networks
+# See here for details: https://en.wikipedia.org/wiki/Rprop
+from pybrain.datasets import SupervisedDataSet  
+from pybrain.supervised.trainers.rprop import RPropMinusTrainer
+
+# For creating one-hot encoded training examples
+# For examples, if there are three actions, and we want the second one the desired output of the policy network is:
+# policy network(state) = (0 1 0) (no preference for 1st and 3rd, chooses 2nd)
+from pybrain.utilities import one_to_n
+
+''' Prints a neural network
+Source of code: http://stackoverflow.com/questions/8150772/pybrain-how-to-print-a-network-nodes-and-weights
+Goes through each layer and prints the weights
+'''
+def printNet(net):
+    for mod in net.modules:
+        print("Module:", mod.name)
+        if mod.paramdim > 0:
+            print("--parameters:", mod.params)
+        for conn in net.connections[mod]:
+            print("-connection to", conn.outmod.name)
+            if conn.paramdim > 0:
+                 print("- parameters", conn.params)
+        if hasattr(net, "recurrentConns"):
+            print("Recurrent connections")
+            for conn in net.recurrentConns:
+                print("-", conn.inmod.name, " to", conn.outmod.name)
+                if conn.paramdim > 0:
+                    print("- parameters", conn.params)
 
 
-# Make policy greedy with respect to current value net 
-def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,thermCenter,numHidden, switchPenal):
+''' Makes policy network greedy with respect to current value estimate
+At each of policyEvalStates, all the actions are tried
+The action that lands in a state with highest value (by current value function) is chosen as desirable
+These desirable actions are used as training examples to form the updated policy network
 
-    from pybrain.datasets import SupervisedDataSet  
-    from pybrain.utilities import one_to_n
+valNet =            value network (inputs = state variable values, output = value of state)
+polNet =            policy network (inputs = state variable values, output = preferences for different actions)
+policyEvalStates =  discretized states used for training networks
+numAct =            number of actions (move towards thermal, away from thermal, orbit)
+stepSize =          distance UAV moves upon making a non-orbiting action
+thermRadius =       standard deviation of Gaussian shaped thermal
+thermCenter =       center of Gaussian shaped thermal
+switchPenal =       the height lost for choosing to switch directions (without passing through center of thermal)
+numMaxEpochs =      IF USING VALIDATION DATA: maximum number of epochs to train the policy network 
+                    IF NOT USING VALIDATION DATA: number of times to train the policy network    
+'''
+# 
+def makeGreedy(valNet, polNet, policyEvalStates, numAct, stepSize, thermRadius,thermCenter, switchPenal, numMaxEpochs):    
     
-    # Reset the policy network (keep same shape, but we don't want weights to grow large)
-    polNet = createPolNetwork(polNet.indim, numHidden, numAct)
+    # Create a new (randomly initialized) policy net, so as to have small weights
+    # Training the old net repeatedly results in very large weights - this should be avoidable, though
+    polNet = mp.createPolNetwork(polNet.indim, numAct)
     
-    supervised = SupervisedDataSet(polNet.indim, numAct) # numInput, numOutputs   
+    # Creates a list to hold training examples
+    # The inputs are the values of the state variables
+    # The outputs are the preference towards each of the numAct actions
+    supervised = SupervisedDataSet(polNet.indim, numAct) # numInputs = polNet.indim, numOutputs = numAct
     
-    # Try all the actions and see which has the best value     
-    nextStateList = []
-    nextValList = []
-    actList = []
+    # For each state in policyEvalStates, determine the best action  
+    actList = [] # The list of actions chosen, for debug purposes
     for state in policyEvalStates:
-        actBest = 0
+    
+        # Clear the value list, because we are considering a new state
         valList = []
-        for action in range(numAct):            
-            nextState = ep.updateState(state, stepSize, action, thermRadius, thermCenter, switchPenal)
-            
-            # Print action and new state:
-            # print('New state: ', nextState)
-            # print('Action: ', action)           
-            vNext = valNet.activate(nextState)
-            valList.append(vNext)        
-            
-            # Store all states and values used, for debugging purposes            
-            nextStateList.append(nextState)
-            nextValList.append(vNext)
-        bestVal = np.max(valList)
-        # print('Val list: ', valList)
         
-        # Choose the best action, breaking ties randomly
+        # Consider all actions - which will be best?
+        for action in range(numAct): 
+            # Determine where we land if we try the action called "action"
+            nextState = ep.updateState(state, stepSize, action, thermRadius, thermCenter, switchPenal)           
+            
+            # Determine the value of the state landed in, nextState
+            vNext = valNet.activate(nextState)
+            
+            # Add the value to the list for this state
+            valList.append(vNext)        
+        
+        # Choose the action that lands in the state with highest value
+        # Breaks ties randomly
+        bestVal = np.max(valList)       
         bestActions = [i for i,j in enumerate(valList) if j == bestVal]     
         chosenAct = random.choice(bestActions)
-        actList.append(chosenAct) # Keep track of all chosen actions for debugging purposes
-        #print('Best actions:', bestActions)
-        # print('Chosen action:', chosenAct)
-        # import pdb; pdb.set_trace()
+        
+        # Store the action chosen, for debug display purposes
+        actList.append(chosenAct) 
+        
+        # Store the new training example, using one-hot encoding
+        # In state "state", we want a preference of 1 for chosenAct, and 0 for all others
         supervised.addSample(state, one_to_n(chosenAct, numAct))
     
-    # Print supervised training set 
-    # print(supervised)
-    # input()
-    
-    # Train neural network
-    # Currently not using interpolation
-    # Relying on resetting netowrk for smoothing
-    # print(supervised)   
-    from pybrain.supervised.trainers.rprop import RPropMinusTrainer                
+    # Train the network, using resilient backpropogation
     trainer = RPropMinusTrainer(polNet, dataset=supervised, verbose=False)  
-    numTrainIter = 50
-    for i in range(numTrainIter):
-        trainer.train()
-    #trainer.trainUntilConvergence(maxEpochs=50) # Uses validation data, not as exact, but avoids overfitting
-    return (polNet, nextStateList, nextValList, actList) # Return both the updated net, and the data we trained on
+    
+    # Two ways to update the neural network: (CHOOSE ONLY ONE)  
+    # =========================================================================== 
+    # 1. With validation data
+    # --The network is trained on a subset of training examples, and then checked to see how well it generalizes to the unused examples
+    # --Danger of underfitting (not matching all the training examples)
+    trainer.trainUntilConvergence(maxEpochs=numMaxEpochs)
+    
+    # # 2. Without validation data
+    # # --The network is trained on all the training examples.
+    # # --Danger of overfitting (sacrificing interpolation)
+    # for i in range(numMaxEpochs):
+        # trainer.train()     
+     # =========================================================================== 
+    
+    return (polNet,  actList) # Return both the updated net, and the data we trained on

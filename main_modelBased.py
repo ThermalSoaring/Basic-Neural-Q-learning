@@ -17,11 +17,14 @@ import itertools
 # For making the value estimates self consistent
 import evalPolicy
 
+# For the creation of a policy network
+import makePolNetwork as mp
+
 # For making the policy greedy with respect to the current value estimates
 import updatePolicy
 
-# For creating the value and policy networks
-from pybrain.structure import SigmoidLayer, LinearLayer, SoftmaxLayer
+# For creating the value network
+from pybrain.structure import SigmoidLayer, LinearLayer
 from pybrain.tools.shortcuts import buildNetwork
 
 # Import libraries for creating and saving plots
@@ -48,27 +51,6 @@ def createValNetwork(dimState):
         return valNet
     else:
         sys.exit('Invalid number of state variables. Should be >= 2.')
-
-''' Returns a policy network
-dimState =  number of state variables
-numHidden = number of neurons in hidden layer
-numAct =    number of possible actions
-'''
-def createPolNetwork(dimState, numAct):
-    # Build a feed forward neural network (with one hidden layer)
-    # Input of policy network: state variables
-    # Output of policy network: preference towards each action
-    if (dimState >= 1 and numAct >= 1):
-        polNet = buildNetwork(dimState, # Number of input units
-                           20, 	        # Number of hidden units
-                           numAct, 	    # Number of output units
-                           bias = True,
-                           hiddenclass = SigmoidLayer,
-                           outclass=SoftmaxLayer # Outputs are in the interval (0,1), and they sum to 1
-                           )	
-        return polNet
-    else:
-        sys.exit('Invalid number of state variables or actions. Both should be >= 1.')
 
 ''' Plot estimated value function at a variety of heights and distances
 valNet =            value network (inputs = state variable values, output = value of state)
@@ -259,7 +241,7 @@ def mainModelBased():
     # Create a policy network (randomly initialized policy choices)
     # ===========================================================================
     numAct = 3 # Number of actions (move towards thermal, away from thermal, orbit)
-    polNet = createPolNetwork(dimState, numAct)   
+    polNet = mp.createPolNetwork(dimState, numAct)   
     # ===========================================================================    
     
     # Choose discretizing states
@@ -293,17 +275,19 @@ def mainModelBased():
     # =========================================================================== 
     stepSize = 0.1  # Distance UAV moves upon making a non-orbiting action
     thermRadius = 3 # Standard deviation of Gaussian shaped thermal 
-    thermCenter = 0 # Center of Gaussian shaped thermal
-    switchPenal = 0.2 # the height lost for chosing to switch directions (without passing through center of thermal)
+    thermCenter = 3 # Center of Gaussian shaped thermal
+    switchPenal = 0 # The height lost for choosing to switch directions (without passing through center of thermal)
     # =========================================================================== 
 
     # Specify learning parameters
     # ===========================================================================
     # For making value function consistent:
-    vMaxAll = 0.5   # Upper bound on maximum change in value estimates across all policyEvalStates before value function is considered self consistent
+    vMaxAll = 0.4   # Upper bound on maximum change in value estimates across all policyEvalStates before value function is considered self consistent
     discRate = 0.7  # How farsighted we are (0 = future gain is worthless, 1 = future gain is just as important as present gain)  
-    numMaxEpochsVal = 30 # IF USING VALIDATION DATA: maximum number of epochs to train the value network 
+    numMaxEpochsVal = 30 # IF USING VALIDATION DATA: maximum number of epochs to train the value network
                          # IF NOT USING VALIDATION DATA: number of times to train the value network
+    numMaxEpochsPol = 50 # IF USING VALIDATION DATA: maximum number of epochs to train the policy network 
+                         # IF NOT USING VALIDATION DATA: number of times to train the policy network
     
     # For the overall learning process"
     numLearn = 100  # Number of times to repeat the following process: make value estimates consistent, make policy greedy with respect to new values
@@ -320,10 +304,9 @@ def mainModelBased():
         valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll,discRate, numMaxEpochsVal, stepSize, thermRadius, thermCenter,switchPenal)  
         
         # Make policy greedy with respect to current value estimates
-        # TEMP
-        numHiddenPol = 20 # Required because policy network is being recreated everytime - this should not be necessary!
-        # END TEMP
-        (polNet, nextStateList, nextValList, actList) = updatePolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize, thermRadius, thermCenter, numHiddenPol, switchPenal)
+        # Returns updated policy network and the best actions under the current value function (actList)
+        # actList was used as training examples to form this new policy
+        (polNet,  actList) = updatePolicy.makeGreedy(valNet, polNet, policyEvalStates,numAct,stepSize, thermRadius, thermCenter, switchPenal, numMaxEpochsPol)
         
         # Print updated value function
         printVal(valNet, policyEvalStates)
