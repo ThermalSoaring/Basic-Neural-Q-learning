@@ -30,7 +30,15 @@ from pybrain.tools.shortcuts import buildNetwork
 # Import libraries for creating and saving plots
 import matplotlib as mpl
 mpl.use('Agg') # Allows plots to be saved instead of being displayed
-import matplotlib.pyplot as plt             
+import matplotlib.pyplot as plt       
+
+# For printing details on error
+import traceback      
+
+# To save and load a network
+# This allows us to use the same network multiple times, to make debugging easier
+from pybrain.tools.customxml.networkwriter import NetworkWriter
+from pybrain.tools.customxml.networkreader import NetworkReader
 
 ''' Returns a value network
 dimState =  number of state variables
@@ -40,7 +48,7 @@ def createValNetwork(dimState):
     # Build a feed forward neural network (with one hidden layer)
     # Input of policy network: value of state variables
     # Output of policy network: value of the state described
-    if (dimState >= 2):
+    if (dimState == 3):
         valNet = buildNetwork(dimState, # Number of input units
                            20,          # Number of hidden units 
                            1, 	        # Number of output units
@@ -50,7 +58,7 @@ def createValNetwork(dimState):
                            )	
         return valNet
     else:
-        sys.exit('Invalid number of state variables. Should be >= 2.')
+        sys.exit('Invalid number of state variables. Should be 3.')
 
 ''' Plot estimated value function at a variety of heights and distances
 valNet =            value network (inputs = state variable values, output = value of state)
@@ -59,6 +67,10 @@ policyEvalStates =  discretized states used for training networks
 heightEval =        the heights at which the value function is evaluated
 '''    
 def graphValues(valNet,heightEval):    
+    # Check for desired number of state variables
+    if (valNet.indim != 3):
+        sys.exit('Invalid number of state variables. Should be 3.')
+    
     # Create list of values of distances from the thermal - x-axis values
     dist = np.linspace(0, 10, num=60)  
     
@@ -73,12 +85,7 @@ def graphValues(valNet,heightEval):
         valList.append([])
         # Get the value given the state variable values (position, height and direction)
         for pos in dist:  
-            if (valNet.indim == 2):
-                val = valNet.activate([pos, height])[0] 
-            elif (valNet.indim == 3):
-                val = valNet.activate([pos, height, dirEval])[0] 
-            else:
-                sys.exit('Invalid input layer size on value net. Should be 2 or 3.')
+            val = valNet.activate([pos, height, dirEval])[0] 
             
             # Append the value to the value list for the current height
             valList[heightInd].append(val)   
@@ -107,6 +114,9 @@ policyEvalStates =  discretized states used for training networks
 actList =           the best actions under the current value function - used as training examples to form this policy
 '''
 def graphPolicy(polNet, policyEvalStates, actList):
+    # Check for desired number of state variables
+    if (polNet.indim != 3):
+        sys.exit('Invalid number of state variables. Should be 3.')
 
     # Create list of values of distances from the thermal - x-axis values
     dist = np.linspace(0, 10, num=60) 
@@ -120,12 +130,7 @@ def graphPolicy(polNet, policyEvalStates, actList):
     dirEval = 0     # Direction at which to evaluate the policy network
     for pos in dist:
         # Get policy preference towards each action
-        if (polNet.indim == 2):
-            preferences = polNet.activate([pos, heightEval])
-        elif (polNet.indim == 3):
-            preferences = polNet.activate([pos, heightEval, dirEval])
-        else:
-            sys.exit('Invalid input layer size on policy net. Should be 2 or 3.')   
+        preferences = polNet.activate([pos, heightEval, dirEval])  
         
         # Save the policy preferences in the appropriate lists
         if (polNet.outdim >= 2):
@@ -149,10 +154,7 @@ def graphPolicy(polNet, policyEvalStates, actList):
     plt.ylim([-0.1,1.1])
     
     # Indicate height and direction used
-    if (polNet.indim == 2):
-        plt.title('Policy at h=' + str(heightEval))
-    elif (polNet.indim == 3):
-        plt.title('Policy at h=' + str(heightEval) + ', d=' + str(dirEval))
+    plt.title('Policy at h=' + str(heightEval) + ', d=' + str(dirEval))
         
     # Plot where the training examples are using vertical lines
     for state in policyEvalStates:
@@ -169,7 +171,7 @@ def graphPolicy(polNet, policyEvalStates, actList):
     stateInd = 0     # Keeps track which state we are currently examining
     for state in policyEvalStates:      
         # Check that state is at desired height and direction
-        if ((polNet.indim == 2 and state[1] == heightEval) or (polNet.indim == 3 and state[1] == heightEval and state[2] == dirEval)): 
+        if (state[1] == heightEval and state[2] == dirEval): 
             # Get distance from center of thermal in this state - x-axis data
             trainDist.append(state[0])
         
@@ -220,7 +222,7 @@ def printVal(valNet, policyEvalStates):
     print('Value \t State')
     for state in policyEvalStates:
         print(valNet.activate(state), '\t', state) 
- 
+  
 ''' Main program loop
 -Create a randomized policy (randomly maps values of state variables to preferences)
 -Calculate consistent state values under this policy
@@ -231,10 +233,15 @@ def mainModelBased():
     # Time stamp this run:
     st = createTimeStamp()
     
-    # Create a value function (randomly initialized values)    
+    # Create a value function (with randomly initialized values)    
     # ===========================================================================
     # Number of state variables used in discretized training examples 
     dimState = 3 # 1 = Position from thermal, 2 = height, 3 = direction
+    
+    # Check for desired number of state variables
+    if (dimState != 3):
+        sys.exit('Invalid number of state variables. Should be 3.')
+        
     valNet = createValNetwork(dimState)
     # ===========================================================================    
     
@@ -248,24 +255,19 @@ def mainModelBased():
     # These are the states at which:
         # The value function makes sures it is self consistent
         # The policy network makes sure it is greedy
-    # ===========================================================================    
-    if (dimState >= 2):    
-        # Distance discretization
-        evalDist = np.linspace(0, 10, num=10)
-        # Height discretization
-        evalHeight = [0, 0.5]#[0, 0.5] # 
-    if (dimState >= 3):
-        # Direction discretization 
-        # 0 = towards thermal center, 1 = away from thermal center
-        evalDir = [0]  
+    # ===========================================================================   
+    # Distance discretization
+    evalDist = np.linspace(0, 10, num=20)
+    
+    # Height discretization
+    evalHeight = [-0.5, 0, 0.5] 
+
+    # Direction discretization 
+    # 0 = towards thermal center, 1 = away from thermal center
+    evalDir = [0, 1]  
     
     # Takes cartesian product to create complete discretized states
-    if (dimState == 2):
-        policyEvalStates = list(itertools.product(evalDist,evalHeight))
-    elif (dimState == 3):
-        policyEvalStates = list(itertools.product(evalDist,evalHeight, evalDir)) 
-    else:
-        sys.exit('Wrong number of state dimensions; should be 1,2 or 3.')        
+    policyEvalStates = list(itertools.product(evalDist,evalHeight, evalDir))      
     # =========================================================================== 
     
     # Print initial (random) policy
@@ -274,9 +276,9 @@ def mainModelBased():
     # Specify environmental parameters
     # =========================================================================== 
     stepSize = 0.1  # Distance UAV moves upon making a non-orbiting action
-    thermRadius = 3 # Standard deviation of Gaussian shaped thermal 
-    thermCenter = 3 # Center of Gaussian shaped thermal
-    switchPenal = 0 # The height lost for choosing to switch directions (without passing through center of thermal)
+    thermRadius = 1.5 # Standard deviation of Gaussian shaped thermal 
+    thermCenter = 5 # Center of Gaussian shaped thermal
+    switchPenal = 0.1 # The height lost for choosing to switch directions (without passing through center of thermal)
     # =========================================================================== 
 
     # Specify learning parameters
@@ -302,6 +304,11 @@ def mainModelBased():
         
         # Make value estimates consistent with current policy        
         valNet = evalPolicy.evalPolicy(valNet,polNet,policyEvalStates,vMaxAll,discRate, numMaxEpochsVal, stepSize, thermRadius, thermCenter,switchPenal)  
+        
+        # Save value network (to use for debugging)
+        if (i == 1):
+            fileName = 'valNet.xml'
+            NetworkWriter.writeToFile(valNet, fileName)
         
         # Make policy greedy with respect to current value estimates
         # Returns updated policy network and the best actions under the current value function (actList)
