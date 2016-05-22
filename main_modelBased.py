@@ -112,8 +112,10 @@ def graphValues(valNet,heightEval):
 polNet =            policy network (inputs = state variable values, output = preferences for different actions)
 policyEvalStates =  discretized states used for training networks
 actList =           the best actions under the current value function - used as training examples to form this policy
+heightEval =        height at which to evalute the policy network
+dirEval =           direction for which to evaluate the policy network
 '''
-def graphPolicy(polNet, policyEvalStates, actList):
+def graphPolicy(polNet, policyEvalStates, actList, heightEval,dirEval):
     # Check for desired number of state variables
     if (polNet.indim != 3):
         sys.exit('Invalid number of state variables. Should be 3.')
@@ -124,10 +126,8 @@ def graphPolicy(polNet, policyEvalStates, actList):
     # Lists of preference values, one list per action - y-axis values
     prefToward = []
     prefAway = []
-    preOrb = []
+    preOrb = []   
     
-    heightEval = 0  # Heights at which to evalute the policy network
-    dirEval = 0     # Direction at which to evaluate the policy network
     for pos in dist:
         # Get policy preference towards each action
         preferences = polNet.activate([pos, heightEval, dirEval])  
@@ -257,7 +257,7 @@ def mainModelBased():
         # The policy network makes sure it is greedy
     # ===========================================================================   
     # Distance discretization
-    evalDist = np.linspace(0, 10, num=20)
+    evalDist = np.linspace(0, 10, num=10)
     
     # Height discretization
     evalHeight = [-0.5, 0, 0.5] 
@@ -284,7 +284,7 @@ def mainModelBased():
     # Specify learning parameters
     # ===========================================================================
     # For making value function consistent:
-    vMaxAll = 0.4   # Upper bound on maximum change in value estimates across all policyEvalStates before value function is considered self consistent
+    vMaxAll = 0.5   # Upper bound on maximum change in value estimates across all policyEvalStates before value function is considered self consistent
     discRate = 0.7  # How farsighted we are (0 = future gain is worthless, 1 = future gain is just as important as present gain)  
     numMaxEpochsVal = 30 # IF USING VALIDATION DATA: maximum number of epochs to train the value network
                          # IF NOT USING VALIDATION DATA: number of times to train the value network
@@ -293,8 +293,13 @@ def mainModelBased():
     
     # For the overall learning process"
     numLearn = 100  # Number of times to repeat the following process: make value estimates consistent, make policy greedy with respect to new values
-    
-    # ===========================================================================             
+    # =========================================================================== 
+
+    # Specify evaluation / display parameters
+    # =========================================================================== 
+    heightEvalPol = -0.3  # Height at which to evaluate / display policy network
+    dirEvalPol = 0     # Distance for which to evaluate / display policy network
+    # =========================================================================== 
     
     # Learning loop
     # =========================================================================== 
@@ -339,7 +344,7 @@ def mainModelBased():
             
             # Plot policy network
             plt.subplot(2, 1, 2)
-            graphPolicy(polNet, policyEvalStates, actList)   
+            graphPolicy(polNet, policyEvalStates, actList,heightEvalPol,dirEvalPol)   
         
             # Store photos
             # Include a time stamp and the current iteration 
