@@ -9,22 +9,24 @@ PyBrain is a Python library for machine learning tasks. For example, it can be u
 * Neural networks are commonly used for many machine learning tasks. PyBrain provides a flexible and easy to use (and open source!) interface for working with them. Neural networks allow programs to carry out classification or function approximation tasks in a flexible and adaptable way. 
  * Here are some resources on neural nets: 
    * https://www.coursera.org/course/neuralnets 
-   * https://www.coursera.org/learn/machine-learning (weeks 4 and 5)
+    * https://www.coursera.org/learn/machine-learning (weeks 4 and 5)
 * Reinforcement learning is a type of machine learning that is good for automating tasks in which the performance of the learning agent can be captured by a “reward function”. For example, reinforcement learning can be used to have a cart learn the way through a maze (a reward is given upon exiting the maze), or it could be used to balance a pendulum (a reward is given when the pendulum is close to the right position). If your project involves a learning task that can be evaluated using a reward function, you might consider using reinforcement learning.
 * A resource on reinforcement learning:
  * https://webdocs.cs.ualberta.ca/~sutton/book/ebook/the-book.html 
 
 # How to Install Pybrain
 Some links to documentation on installation: (you will need git and python installed already)  
-http://pybrain.org/docs/ , https://github.com/pybrain/pybrain/wiki/installation , and http://pybrain.org/docs/quickstart/installation.html
+* http://pybrain.org/docs/ 
+* https://github.com/pybrain/pybrain/wiki/installation 
+* http://pybrain.org/docs/quickstart/installation.html
 
 ### Copy the PyBrain files from Github
-To copy the Pybrain files from Github, run this command in a terminal (on Windows I use the Git bash terminal):    
+To copy the Pybrain files from Github, run this command in a terminal (on Windows I use the Git Bash terminal):    
 ```
 git clone git://github.com/pybrain/pybrain.git
 ```
 
-### Run the installation file (copied from Github) to setup PyBrain 
+### Run the installation file (copied from GitHub) to setup PyBrain 
 To run the installation file, run this command:  
 ```
 python setup.py install
@@ -85,7 +87,7 @@ We can specify which learning algorithm PyBrain uses. One very common algorithm 
 # PyBrain and Reinforcement Learning 
 
 To understand how PyBrain’s reinforcement learning framework works, you have to spend some time crawling through the source code to see what relates to what. Here is a really good picture to keep in mind during this exploration:  
-(Picture source: http://pybrain.org/docs/tutorial/reinforcement-learning.html) 
+(picture source: http://pybrain.org/docs/tutorial/reinforcement-learning.html) 
 ![alt text](https://raw.githubusercontent.com/ThermalSoaring/Model-Based-RL-for-Thermal-Soaring/321b1d9a23b9dde6b96eda37d39bfed5ee1799b9/RLwithPyBrain.png "Logo Title Text 1")
 
 I briefly discuss what each of these parts are, and what they do. However, to really understand what is going on you need to explore the library for yourself.
@@ -104,10 +106,10 @@ To actually have the agent learn, do something like this, after calling doIntera
 The first line makes the agent learn based on the experiences it just went through (states, actions, and rewards). The second line (I believe) deletes the information about the experience it just went through, preparing it for the next round of interactions with the environment.
 
 ## Agent:
-The agent is the thing that interacts with the environment, and that you want to learn how to interact with the environment in a way that maximizes reward. For example, for our thermal soaring project the UAV was our agent. The agent selects actions (ex. start orbiting), and receives rewards and observations (how good was what I did, and where am I now). The agent also learns from its experience, using something like Q learning to update its estimates of how good different actions are in different states. 
+The agent is the thing that interacts with the environment, and that you want to learn how to interact with the environment in a way that maximizes reward. For example, in our thermal soaring project the UAV was our agent. The agent selects actions (ex. start orbiting), and receives rewards and observations (how good was what I did, and where am I now). The agent also learns from its experience, using something like Q learning to update its estimates of how good different actions are in different states. 
 
 ## Environment:
-The environment keeps track of the physics of the system. It keeps track of the state of the agent, and can update it in response to the actions of the agent. For example, our environment stored the height and position of the UAV, and could update the height of the UAV based on thermal strength at the current position of the UAV.
+The environment keeps track of the physics of the system. It keeps track of the state of the agent, and can update it in response to the actions of the agent. For example, our environment stores the height and position of the UAV, and can update the height of the UAV based on thermal strength at the current position of the UAV.
 
 ## Task:
 The task acts as a barrier between the agent and the environment. It can choose what information is provided to the learning agent by the environment, and it can choose how to filter or modify actions provided by the learning agent before it provides those to the environment.
