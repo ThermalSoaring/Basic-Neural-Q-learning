@@ -84,11 +84,11 @@ We can specify which learning algorithm PyBrain uses. One very common algorithm 
 
 # PyBrain and Reinforcement Learning 
 
-To understand how PyBrain’s reinforcement learning framework works, you have to spend some time crawling through the source code to see what relates to what. Here is a really good picture to keep in mind during this exploration: 
+To understand how PyBrain’s reinforcement learning framework works, you have to spend some time crawling through the source code to see what relates to what. Here is a really good picture to keep in mind during this exploration:  
 (Picture source: http://pybrain.org/docs/tutorial/reinforcement-learning.html) 
+![alt text](https://raw.githubusercontent.com/ThermalSoaring/Model-Based-RL-for-Thermal-Soaring/321b1d9a23b9dde6b96eda37d39bfed5ee1799b9/RLwithPyBrain.png "Logo Title Text 1")
 
-Here is a brief conceptual example to give an idea of what each of these parts do. Again, you need to spend some time with the library files to understand what is happening.
-
+I briefly discuss what each of these parts are, and what they do. However, to really understand what is going on you need to explore the library for yourself.
 ## Experiment: 
 The experiment contains everything. Once everything is set up, then you can just tell the experiment to run. For example, consider this code:
 ```
