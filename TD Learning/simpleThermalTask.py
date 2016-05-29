@@ -41,6 +41,3 @@ class SimpThermTask(Task):
     def getDist(self):
         dist = self.env.sensors
         return dist
-
-
-

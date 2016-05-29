@@ -231,20 +231,6 @@ def netBasedMethod(maxPlaneStartDist,numAngs,thermRadius,stepSize):
     # Testing
     testNet(agent.learner, agent.module,env, maxPlaneStartDist, stepSize,numAngs,thermRadius)
 
-# Use a lookup table to store state action vvalues
-def tableMain():    
-    maxPlaneStartDist = 8   # Starting plane distance from thermal, or the maximum such distance if random placement of plane is allowed
-    numAngs = 5             # The number of directions in which the plane is allowed to move
-    numDist = 6             # Discretizing distances from center into this many chunks
-    thermRadius = 3;        # Standard deviation of thermal
-    stepSize = 0.1          # How far the plane moves on each interaction
-    
-    # I stuck table related stuff in here 
-    # Some code is duplicated from main.py, but I want to be able to work on net based stuff without worrying if the table based stuff is being messed up
-    # Basically, tabledBasedMethods.py is where I'm dumping the working table based method
-    import tabledBasedMethods as tbm
-    tbm.tableBasedMethod(maxPlaneStartDist,numAngs,numDist,thermRadius,stepSize)
-
 # Use a neural network to store state action values
 def netMain():
     maxPlaneStartDist = 2  # Starting plane distance from thermal, or the maximum such distance if random placement of plane is allowed
@@ -253,8 +239,7 @@ def netMain():
     stepSize = 1          # How far the plane moves on each interaction
     netBasedMethod(maxPlaneStartDist,numAngs,thermRadius,stepSize)
 
-    
-#tableMain() # Works reasonably well
-netMain()
+if __name__ == "__main__":  
+    netMain()
 
 
