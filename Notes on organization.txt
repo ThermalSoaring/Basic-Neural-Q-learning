@@ -1,0 +1,10 @@
+Model Based RL
+-Uses dynamic programming to create and update policy and value estimates
+-These discrete estimates are interpolated using neural networks
+
+Q learning
+-Neural fitted Q learning (model free interpolation of Q values)
+-Table based Q learning (for a discrete environment)
+
+Tutorials
+-Explanations / resources on tools / ideas used in this project
