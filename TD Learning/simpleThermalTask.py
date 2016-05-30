@@ -1,43 +1,38 @@
+# Forms an interface between the agent (UAV) and the environment (thermal)
 # Based on mdp task by Thomas Rueckstiess, ruecksti@in.tum.de
+# Interacts with a simpThermEnvironment or contThermalEnvironment environment
 
 from pybrain.rl.environments import Task
 from scipy import array, asarray
 from math import pi, sqrt, exp
 
-# This task is designed to interact with a simpThermEnvironment environment
-# --It will also work with contThermalEnvironment
-# When this task is created, an environment is attached to it
-# --We can refer to this environment by self.env
-
 class SimpThermTask(Task):
+    # When this task is created, an environment is attached to it (self.env)
 
+    # Get reward based on current sensor values
     def getReward(self):
-        """ compute and return the current reward (i.e. corresponding to the last action performed) """
-        # Give a reward corresponding to how close to the thermal we are
-        # The reward follows  a normal distribution with the standard deviation of the thermal
+        
+        # Give a reward corresponding to the boost we're getting from the thermal
+        # Currently assuming a Gaussian shaped thermal
         distToThermal = self.env.sensors         
         sigma = self.env.thermRadius
         reward = 1/(sigma*sqrt(2*pi)) * exp(-pow(distToThermal,2)/(2*pow(sigma,2)))   
         
         return reward        
 
+    # Hands action to super class
     def performAction(self, action):
-        """ The action vector is stripped and the only element is cast to integer and given
-            to the super class.
-        """
         Task.performAction(self, int(action[0]))
 
-
-    def getObservation(self):
-        """ The agent returns its distance to the center of the thermal.
-        This information is acquired through the environment.
-        """
+    # The agent returns its distance to the center of the thermal.
+    # This information is acquired through the environment.
+    def getObservation(self):        
         distToThermal = self.env.getSensors() 
         obs = distToThermal
         
         return obs
     
-    # Allows for direct access of the float distance to the center of the thermal
+    # Allows for direct access of the distance to the center of the thermal (not discretized)
     def getDist(self):
         dist = self.env.sensors
         return dist

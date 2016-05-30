@@ -12,7 +12,10 @@
   * How fast / accurate is this compared to previous work?
 * Fixing and understanding older work
   * Open loop debugging (esp. for dynamic programming with neural interpolation)
-  * For NFQ, look up dynamic networks (how to incorporate newer information properly)
+  * For NFQ
+    * Look up dynamic networks (how to incorporate newer information properly)
+    * Make sure action value network is initialized properly  
   * For table based method:
     * Make sure deep copying in learningCycle() in tableBasedMethods.py is done properly
+      * Can't we just used the reset function for the environment class?
     * Make sure neural network is training properly on table (why doesn't it match that well?)

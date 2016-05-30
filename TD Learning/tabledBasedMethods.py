@@ -3,10 +3,7 @@ Carries out the goals described in tableMain.py
 '''
 import numpy as np
 from math import pi
-
-# An easy to use Gaussian function
-import simpleThermal as simpTh   
-    
+   
 # Describes the thermal environment (updates sensor values given actions). Sensor values discretized.       
 import simpleThermalEnvironment as thermEnv 
 
@@ -68,7 +65,6 @@ def createEnvDisc(maxPlaneStartDist, numAngs, numDist, thermRadius, stepSize):
     Learner examples: Q or SARSA learner
     Explorer example: epsilon greedy explorer
 '''
-
 # Print the value of each action in numDist states, according to table
 def printDiscAgent(numDist, table):
     print('Discrete agent value estimates:')
@@ -236,6 +232,7 @@ def testTable(learner,table,env,maxPlaneStartDist,stepSize,numAngs,numDist,therm
                        outclass = LinearLayer # Allows for a large output
                        )	
     # Train network
+    # DOESN'T SEEM TO ALWAYS WORK - NOT WORKING PROPERLY: DEBUG WORK NEEDED
     trainer = BackpropTrainer(net, ds, verbose = False)
     trainer.trainUntilConvergence(maxEpochs = 200)        
 

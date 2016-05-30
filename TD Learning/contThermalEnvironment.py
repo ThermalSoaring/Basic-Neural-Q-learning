@@ -1,37 +1,30 @@
-# Based on CartPoleEnvironment by Thomas Rueckstiess, ruecksti@in.tum.de
+''' 
+Based on CartPoleEnvironment by Thomas Rueckstiess, ruecksti@in.tum.de
+Provides sensor values and updates sensor values based on actions (uses Gaussian shaped thermal)
+Returned sensor values are continuous
+-Currently, only sensor value is distance from center of thermal
 
-import simpleThermal as simpTh # Contains easy to use Gaussian function
-
-from matplotlib.mlab import rk4
+Used by the neural fitted Q method, not the table based method
+'''
 from math import sin, cos, sqrt, pow, pi, floor
-import time
-from scipy import eye, matrix, random, asarray
 
 from pybrain.rl.environments.environment import Environment
 
-
-class contThermEnvironment(Environment):
-    """ 
-        Provides a simple Gaussian "goodness" function        
-    """
-    
-    # the number of action values the environment accepts
-    # The input is cos(theta), where theta is the angle from a line drawn from the plane to the center of the thermal
+class contThermEnvironment(Environment):   
+    # The number of dimensions in the action vector
+    # The input is cos(theta), where theta is the angle from zero along a line drawn from the plane to the center of the thermal
     # - To illustrate, the input is 1 if the plane travels directly towards the thermal, and 0 if it travels at right angles    
     indim = 1 
     
     # The number of sensor values the environment produces
-    # Distance to estimated center of thermal is currently provided
+    # Currently only sensor is distance from center of thermal
     outdim = 1
 
-    # We set the distance of the plane from the center of the thermal randomly
-    randomInitialization = False
-
-    def __init__(self, maxPlaneStartDist, stepSize, numAngles, thermRadius):
-        # distPlaneRange specifies the maximum distance the plane can be from the center on startup
-        self.maxPlaneStartDist = maxPlaneStartDist
+    def __init__(self, planeStartDist, stepSize, numAngles, thermRadius):
+        # planeStartDist is the distance the plane starts from the thermal center
+        self.planeStartDist = planeStartDist
         
-        # stepSize is how far the plan moves each time
+        # stepSize is how far the UAV moves each time
         self.stepSize = stepSize
                 
         # numAngles is the number of discrete directions the plane can move
@@ -40,23 +33,23 @@ class contThermEnvironment(Environment):
         # Sets standard deviation of normal shaped reward function
         self.thermRadius = thermRadius
         
-        # initialize the environment (randomly)
+        # Initialize the stored values for the states and actions of the agent
         self.reset()
         self.action = 0.0
         self.delay = False
-
+        
+    # Returns (non-discretized) distance to center of thermal
     def getSensors(self):
-        return [self.sensors] # Returns (unrounded) distance to center
-
-    # Performs a provided action
+        return [self.sensors]
+ 
+    # Carries out the action provided by the agent
     # The action is theta, where theta is the angle (in radians) from a line drawn from the plane to the center of the thermal
     # - To illustrate, the input is 0 if the plane travels directly towards the thermal, and pi/2 if it travels at a right angle to the thermal center    
     def performAction(self, action):   
         self.action = action # This updates theta (angle to move on)
         self.step()
 
-    # Update sensor values (update value of goodness after plane has moved)
-    # Uses the current values of self.action
+    # Update sensor values to capture the movement of the UAV, given the current intended action
     def step(self):
         # Determine the new distance from the center
         oldDist = self.sensors
@@ -78,19 +71,11 @@ class contThermEnvironment(Environment):
         newDist = sqrt(pow(deltaTempX,2)+ pow(deltaTempY,2))
         self.sensors = newDist
         
-        # Reset is called when environment is constructed
+    # Resets sensor values
     def reset(self):
-        """ re-initializes the environment, setting the plane back at a random distance from the center of the thermal
-        """
-        if self.randomInitialization:
-            planeDist = random.uniform(0, self.maxPlaneStartDist) # The distance the plane is from the center of the thermal
-        else:
-            planeDist = self.maxPlaneStartDist
-            
-        # Initialize sensors
-        self.sensors = planeDist
+        # Move UAV back to starting position from thermal center
+        self.sensors = self.planeStartDist  
         
-    # Returns the distance of the plane from the center of goodness
+    # Return the distance of the UAV from the thermal center
     def distPlane(self):
         return self.sensors
-
