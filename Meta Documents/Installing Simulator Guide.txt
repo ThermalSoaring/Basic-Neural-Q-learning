@@ -1,0 +1,13 @@
+git clone https://github.com/tridge/crrcsim-ardupilot.git crrcsim-apm
+(Go inside cloned directory)
+./autogen.sh
+./configure
+make
+sudo make install
+
+Says we are missing some stuff 
+-Need to run some install commands
+
+Couldn't install:
+libts-dev (But all else installed).
+
